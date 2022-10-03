@@ -1,15 +1,3 @@
-# rotoedge-scheduler-poc
-
-Proof of concept for RotoEdge Scheduler.
-
-### Bryntum Scheduler Library
-
-https://www.bryntum.com/docs/scheduler/
-
-Testing commit capability
-
-===================================
-
 # Basic React Scheduler component template
 
 This project was bootstrapped with the Bryntum [Create React App](https://github.com/facebook/create-react-app) template
@@ -99,16 +87,16 @@ The build artifacts will be stored in the `build/` directory.
 
 # Distribution zip references
 
-- Bryntum API docs. Open `docs/index.html` in your browser.
-- Bryntum Repository guide `docs/guides/npm-repository.md`.
-- Bryntum React integration guide `docs/guides/integration/react.md`.
+* Bryntum API docs. Open `docs/index.html` in your browser.
+* Bryntum Repository guide `docs/guides/npm-repository.md`.
+* Bryntum React integration guide `docs/guides/integration/react.md`.
 
 # Online References
 
-- [React Framework](https://github.com/facebook/create-react-app)
-- [Bryntum React integration guide](https://bryntum.com/docs/scheduler/guide/Scheduler/integration/react)
-- [Bryntum Scheduler documentation](https://bryntum.com/docs/scheduler)
-- [Bryntum Scheduler examples](https://bryntum.com/examples/scheduler)
-- [Bryntum npm repository guide](https://bryntum.com/docs/scheduler/guide/Scheduler/npm-repository)
-- [Bryntum support Forum](https://bryntum.com/forum)
-- [Contacts us](https://bryntum.com/contact)
+* [React Framework](https://github.com/facebook/create-react-app)
+* [Bryntum React integration guide](https://bryntum.com/docs/scheduler/guide/Scheduler/integration/react)
+* [Bryntum Scheduler documentation](https://bryntum.com/docs/scheduler)
+* [Bryntum Scheduler examples](https://bryntum.com/examples/scheduler)
+* [Bryntum npm repository guide](https://bryntum.com/docs/scheduler/guide/Scheduler/npm-repository)
+* [Bryntum support Forum](https://bryntum.com/forum)
+* [Contacts us](https://bryntum.com/contact)
