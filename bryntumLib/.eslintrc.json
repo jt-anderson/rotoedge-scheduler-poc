@@ -1,0 +1,12 @@
+{
+    "env": {
+        "browser": true
+    },
+    "globals": {
+        "$": true
+    },
+    "rules": {
+        "no-case-declarations": "off",
+        "no-prototype-builtins": "off"
+    }
+}
