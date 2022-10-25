@@ -1,14 +1,14 @@
-import React, { useRef, useCallback, useState, useEffect, FC } from "react";
+import React, { useRef, useState, useEffect, FC } from "react";
 import BryntumSchedulerComponent from "./Scheduler";
 import CustomDrag from "../lib/CustomDragHelper";
 import { BryntumScheduler } from "@bryntum/scheduler-react";
-import { ResourceStore, ResourceModel } from "@bryntum/scheduler";
 
 interface ArmSchedulerProps {
-  unassignedStore: any;
-  dragContainer: any;
+  unassignedStore?: any;
+  dragContainer?: any;
   scheduledArmOrders: any;
   armId: number;
+  readOnly?: boolean;
 }
 
 const ArmScheduler: FC<ArmSchedulerProps> = ({
@@ -16,7 +16,10 @@ const ArmScheduler: FC<ArmSchedulerProps> = ({
   dragContainer,
   scheduledArmOrders,
   armId,
+  readOnly = true,
 }) => {
+  const isReadOnly = readOnly || !dragContainer || !unassignedStore;
+
   const scheduler = useRef<BryntumScheduler>(null);
 
   // Get unique resources from the orders that are scheduled on the arm
@@ -32,35 +35,33 @@ const ArmScheduler: FC<ArmSchedulerProps> = ({
   // Map to objects with the resource as the id. Needed for resource store
   resources = resources.map((res: any) => ({ id: res }));
 
-  const [rows, setRows] = useState(resources);
-  // Create resource store so it can be accessed by the drag helper class
-  // const resourceStore = new ResourceStore({
-  //   data: rows.map((item: any) => new ResourceModel(item)),
-  // });
+  const [rows] = useState(resources);
 
   useEffect(() => {
     // Instantiate the drag class here. It's config ties the scheduler to the container
     // for drag and drop events. (ONLY for dragging items onto the scheduler. Dragging items back to the
     // unqueued list has logic handled in the Scheduler component itself.)
-    new CustomDrag({
-      armId,
-      unassignedStore,
-      schedule: scheduler.current?.instance,
-      outerElement: dragContainer.current,
-      dropTargetSelector: `.scheduler-${armId} .b-timeline-subgrid`,
-    });
+    if (!isReadOnly) {
+      new CustomDrag({
+        armId,
+        unassignedStore,
+        schedule: scheduler.current?.instance,
+        outerElement: dragContainer.current,
+        dropTargetSelector: `.scheduler-${armId} .b-timeline-subgrid`,
+      });
+    }
   }, []);
 
   return (
     <div id="schedulerContainer" className={`scheduler-${armId}`}>
       <BryntumSchedulerComponent
         armId={armId}
-        readOnly={false}
-        forwardRef={scheduler}
+        schedulerRef={scheduler}
         events={scheduledArmOrders}
         // resourceStore={resourceStore}
         resources={rows}
         unassignedStore={unassignedStore}
+        readOnly={isReadOnly}
       />
     </div>
   );

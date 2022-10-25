@@ -6,11 +6,7 @@ import React, {
   Fragment,
   useEffect,
 } from "react";
-import {
-  BryntumScheduler,
-  BryntumButton,
-  BryntumCombo,
-} from "@bryntum/scheduler-react";
+import { BryntumScheduler } from "@bryntum/scheduler-react";
 import { DateHelper, PresetManager, PresetStore } from "@bryntum/scheduler";
 import { schedulerConfig } from "../lib/SchedulerConfig";
 import OrderStore from "../lib/OrderStore.js";
@@ -24,11 +20,12 @@ import { cleanupResources } from "../lib/Util";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
-import Select, { SelectChangeEvent } from "@mui/material/Select";
+import Select from "@mui/material/Select";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import IconButton from "@mui/material/IconButton";
 import { customPresets } from "../lib/SchedulerTimeConfig";
+import HardBreakStore from "../lib/HardBreakStore";
 
 /**
  * @param {any[]} orders Array of orders that are placed on Scheduler
@@ -36,36 +33,28 @@ import { customPresets } from "../lib/SchedulerTimeConfig";
  */
 interface BscProps {
   orders?: any[];
-  readOnly: boolean;
-  forwardRef: any;
+  schedulerRef: any;
   events: any[];
-  unassignedStore: any;
+  unassignedStore?: any;
   armId?: any;
-  // resourceStore: any;
   resources: any[];
+  readOnly: boolean;
 }
 
 const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
-  readOnly = true,
-  forwardRef,
+  readOnly,
+  schedulerRef,
   events,
   unassignedStore,
   armId,
-  // resourceStore,
   resources,
 }) => {
-  const [addHardBreakOpen, setAddHardBreakOpen] = useState(false);
-
-  // event store is needed by scheduler
-  const [scheduledStore] = useState(new OrderStore());
-
+  const [scheduledStore] = useState(new OrderStore()); // Schedule store
   const [hbIdIncrement, setHbIdIncrement] = useState(1);
-  const [hardBreaks, setHardBreaks]: any[] = useState([]);
-
   const [eventDetailOpen, setEventDetailOpen] = useState(false);
   const [eventDetail, setEventDetail] = useState(null);
-
-  const [orders, setOrders] = useState(events);
+  const [activePreset, setActivePreset] = useState("oneWeekPreset");
+  const [addHardBreakOpen, setAddHardBreakOpen] = useState(false);
 
   const closeEventDetailDialog = () => {
     setEventDetailOpen(false);
@@ -87,33 +76,58 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
       cls: "hard-break-scheduler",
     };
     setHbIdIncrement(hbIdIncrement + 1);
-    setHardBreaks([...hardBreaks, newHardBreakObj]);
+    schedulerRef.current.instance.timeRangeStore.add(newHardBreakObj);
+  };
+
+  const removeHardBreakLine = (config: any) => {
+    // This is by far the most hacky solution
+    let { targetElement } = config;
+    if (targetElement.tagName === "LABEL") {
+      targetElement = targetElement.parentElement;
+    }
+    const data = targetElement.dataset.id;
+    schedulerRef.current.instance.timeRangeStore.remove(data);
+  };
+
+  const saveChanges = () => {
+    const schedulerInstance = schedulerRef.current.instance;
+    const modifications: any = {
+      scheduler: {
+        added: schedulerInstance.eventStore.added.items,
+        removed: schedulerInstance.eventStore.removed.items,
+        modified: schedulerInstance.eventStore.modified.items,
+      },
+      unscheduledOrders: {
+        added: unassignedStore.added.items,
+        removed: unassignedStore.removed.items,
+        modified: unassignedStore.modified.items,
+      },
+      resources: {
+        added: schedulerInstance.resourceStore.added.items,
+        removed: schedulerInstance.resourceStore.removed.items,
+        modified: schedulerInstance.resourceStore.modified.items,
+      },
+      hardBreaks: {
+        added: schedulerInstance.timeRangeStore.added.items,
+        removed: schedulerInstance.timeRangeStore.removed.items,
+        modified: schedulerInstance.timeRangeStore.modified.items,
+      },
+    };
+    // To-Do: We need to reconnect the priority queue so we can update the items with new "load-after" orders.
+    // This list of modifications will help; but the process is going to be a little complicated.
+    console.log("modifications", modifications);
   };
 
   const cancelChanges = () => {
-    const eventIds = events.map((e) => e.id);
-    const toRemove: any = [];
-    scheduledStore.allRecords.forEach((order: any) => {
-      if (!eventIds.includes(order.id)) {
-        toRemove.push(order);
-      }
-    });
-    scheduledStore.remove(toRemove);
-    unassignedStore.add(toRemove);
-    cleanupResources(forwardRef.current.instance.resourceStore);
-    setHardBreaks([]);
+    scheduledStore.revertChanges(); // reset the scheduled orders
+    unassignedStore.revertChanges(); // reset the unassigned orders
+    scheduledStore.resourceStore.revertChanges(); // reset the rows
+    schedulerRef.current.instance.timeRangeStore.revertChanges(); // reset the hard breaks
   };
-
-  useEffect(() => {
-    // Add custom time presets to PresetManager once when page loads
-    PresetManager.add(customPresets);
-  }, [customPresets]);
-
-  const [activePreset, setActivePreset] = useState("oneWeekPreset");
 
   const handlePresetChange = (e: any) => {
     const presetId = e.target.value;
-    forwardRef.current.instance.zoomTo({
+    schedulerRef.current.instance.zoomTo({
       preset: presetId,
       startDate: new Date(),
       endDate: new Date(),
@@ -122,34 +136,47 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     setActivePreset(presetId);
   };
 
+  useEffect(() => {
+    // Add custom time presets to PresetManager once when page loads
+    PresetManager.add(customPresets);
+  }, [customPresets]);
+
+  const hardBreakStore = new HardBreakStore({
+    data: [
+      {
+        id: 123,
+        startDate: "2022-10-25T11:00",
+        // endDate        : '2019-01-01T13:00',
+        name: "Hard Break",
+        cls: "hard-break-scheduler",
+      },
+    ],
+  });
+
   return (
     <Box flexDirection="column" className="flex-grow">
       {/* Both containers needs CSS properties in flex-grow class */}
       <div id="bryntumScheduler" className="flex-grow bryntumScheduler">
         <BryntumScheduler
-          ref={forwardRef}
-          events={orders}
+          ref={schedulerRef}
+          readOnly={readOnly}
+          events={events}
           resources={resources}
-          timeRanges={hardBreaks}
+          // timeRanges={hardBreaks}
           viewPreset={activePreset}
           presets={customPresets}
-          onTimeRangeHeaderClick={() => {
-            console.log("onTimeRangeHeaderClick clicked");
-          }}
           crudManager={{
             eventStore: scheduledStore,
+            timeRangeStore: hardBreakStore,
             autoLoad: true,
           }}
           eventRenderer={(config: any) => {
             const { renderData, eventRecord } = config;
-            // renderData.style = `background:${bgColor};border-color:${bgColor};color:${encodeHtml(resourceRecord.textColor)}`;
             renderData.style = `border-radius:${"5px"}`;
             renderData.eventColor = eventRecord.item_currently_molding
               ? "blue"
               : "rgb(189 175 108)";
-
-            const { work_order_number, balance } = eventRecord;
-            return `WO: ${work_order_number} (${balance} Parts)`;
+            return eventRecord.name;
           }}
           timeRangesFeature={{
             showCurrentTimeLine: {
@@ -158,6 +185,10 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             showHeaderElements: true,
             enableResizing: true,
             showTooltip: true,
+            callOnFunctions: true,
+            onClick() {
+              console.log("sdjhsdkfhjksdfhkjsd");
+            },
             // tooltipTemplate({ timeRange }) {
             //   return `${timeRange.name}`;
             // },
@@ -183,17 +214,17 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               copyEvent: false,
               cutEvent: false,
               deleteEvent: false,
-              unassign: {
+              unassign: !readOnly && {
                 icon: null,
                 text: "Unassign",
                 weight: 300,
                 onItem: (config: any) => {
                   scheduledStore.remove(config.eventRecord);
                   unassignedStore.add(config.eventRecord);
-                  cleanupResources(forwardRef.current.instance.resourceStore);
+                  cleanupResources(schedulerRef.current.instance.resourceStore);
                 },
               },
-              moveForward: {
+              moveForward: !readOnly && {
                 text: "Move 1 Day Ahead",
                 cls: "b-separator", // Add a visual line above the item
                 weight: 400, // Add the item to the bottom
@@ -229,15 +260,8 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               currentTimeLine: false,
               removeHardBreak: {
                 text: "Remove Hard Break",
-                weight: 400, // Add the item to the bottom
-                onItem: (config: any) => {
-                  const popHardBreak = hardBreaks.slice(
-                    0,
-                    hardBreaks.length - 1
-                  );
-                  // console.log("popHardBreak", popHardBreak);
-                  setHardBreaks(popHardBreak);
-                },
+                weight: 400,
+                onItem: removeHardBreakLine,
               },
             },
             processItems: (config: any) => {
@@ -245,14 +269,12 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               const timeRangeClasslist = targetElement?.classList;
               const timeRangeParentClasslist =
                 targetElement?.parentElement?.classList;
+
+              console.log("config", config);
               if (
-                timeRangeClasslist &&
-                timeRangeParentClasslist &&
-                (timeRangeClasslist.value.includes("timerange") ||
-                  timeRangeParentClasslist.value.includes("timerange"))
+                !timeRangeClasslist.value.includes("timerange") &&
+                !timeRangeParentClasslist.value.includes("timerange")
               ) {
-                // We don't want to do anything :)
-              } else {
                 config.items.removeHardBreak = false;
               }
             },
@@ -266,7 +288,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               if (res.externalDropTarget) {
                 scheduledStore.remove(eventRecords);
                 unassignedStore.add(eventRecords);
-                cleanupResources(forwardRef.current.instance.resourceStore);
+                cleanupResources(schedulerRef.current.instance.resourceStore);
               }
             },
           }}
@@ -279,7 +301,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             size={"small"}
             sx={{ display: "flex" }}
             color="primary"
-            onClick={() => forwardRef.current.instance.shiftPrevious()}
+            onClick={() => schedulerRef.current.instance.shiftPrevious()}
           >
             <ChevronLeftIcon />
           </IconButton>
@@ -292,43 +314,41 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             size={"small"}
             sx={{ display: "flex" }}
             color="primary"
-            onClick={() => forwardRef.current.instance.shiftNext()}
+            onClick={() => schedulerRef.current.instance.shiftNext()}
           >
             <ChevronRightIcon />
           </IconButton>
-          {/* <BryntumButton
-          icon="b-fa-angle-right"
-          tooltip="View next day"
-          onClick={() => forwardRef.current.instance.shiftNext()}
-        /> */}
         </Box>
-        <Box display={"flex"}>
-          <Button
-            variant="outlined"
-            size={"small"}
-            sx={{ display: "flex", marginRight: 1 }}
-            color="info"
-            onClick={() => setAddHardBreakOpen(true)}
-          >
-            Add Hard Break
-          </Button>
-          <Button
-            variant="outlined"
-            size={"small"}
-            sx={{ display: "flex", marginRight: 1 }}
-          >
-            Save Changes
-          </Button>
-          <Button
-            variant="outlined"
-            size={"small"}
-            sx={{ display: "flex" }}
-            color="error"
-            onClick={cancelChanges}
-          >
-            Discard Changes
-          </Button>
-        </Box>
+        {!readOnly && (
+          <Box display={"flex"}>
+            <Button
+              variant="outlined"
+              size={"small"}
+              sx={{ display: "flex", marginRight: 1 }}
+              color="info"
+              onClick={() => setAddHardBreakOpen(true)}
+            >
+              Add Hard Break
+            </Button>
+            <Button
+              variant="outlined"
+              size={"small"}
+              sx={{ display: "flex", marginRight: 1 }}
+              onClick={saveChanges}
+            >
+              Save Changes
+            </Button>
+            <Button
+              variant="outlined"
+              size={"small"}
+              sx={{ display: "flex" }}
+              color="error"
+              onClick={cancelChanges}
+            >
+              Discard Changes
+            </Button>
+          </Box>
+        )}
       </Box>
       <EventDetailDialog
         closeEventDetail={closeEventDetailDialog}
@@ -401,14 +421,13 @@ const EventDetailDialog: FC<EventDetailDialogProps> = ({
 interface InfoLabelProps {
   label: string;
   value: string;
-  variant?: string;
+  variant?: any; // Need MUI Variant typescript type
 }
 
 const InfoLabel: FC<InfoLabelProps> = ({ label, value, variant = "body1" }) => {
   return (
     <Box display="flex" justifyContent={"space-between"}>
       <Typography mr={4} variant={variant}>
-        {" "}
         {label}
       </Typography>
       <Typography variant={variant}> {value}</Typography>
@@ -427,7 +446,7 @@ const AddHardBreakDialog: FC<AddHardBreakDialogProps> = ({
   open,
   onClose,
 }) => {
-  const dateTimeRef = useRef(null);
+  const dateTimeRef: any = useRef(null);
 
   if (!open) {
     return <Fragment></Fragment>;

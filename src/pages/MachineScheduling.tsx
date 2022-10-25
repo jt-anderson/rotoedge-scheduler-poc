@@ -1,11 +1,5 @@
-import React, {
-  useState,
-  FC,
-  Fragment,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useState, FC, useEffect, useCallback, useRef } from "react";
+// MUI
 import {
   Box,
   Typography,
@@ -14,11 +8,19 @@ import {
   AccordionDetails,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+// Custom component imports
 import UnassignedTable from "../components/UnassignedTable";
 import ArmScheduler from "../components/ArmScheduler";
 import CustomDragContainer from "../components/SchedulerDragContainer";
+import ArmDetail from "../components/ArmDetail";
+// Custom library imports
 import UnassignedStore from "../lib/UnassignedStore";
-import Order from "../lib/Order";
+import {
+  mapToOrderModel,
+  normalizeOrder,
+  getOrdersWithStartDates,
+} from "../lib/Util";
+// Mock data imports
 import { machines_response } from "../data/machines";
 import { unloadedOrders } from "../data/sample-data";
 import { machine_display_response } from "../data/machine-display";
@@ -27,11 +29,6 @@ import {
   arm_62_unscheduled_orders,
   arm_63_unscheduled_orders,
 } from "../data/arm-unscheduled-orders";
-import {
-  mapToOrderModel,
-  normalizeOrder,
-  getOrdersWithStartDates,
-} from "../lib/Util";
 
 const MachineScheduling = () => {
   // Using state hook because I'm assuming this data will be set in a useEffect later
@@ -124,7 +121,7 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   // Required: Make a new ref for the external drag container (MUI table with assigned orders)
   const dragContainer = useRef(null);
 
-  // This represents all of the orders tht are scheduled but are not currently molding
+  // This represents all of the orders that are scheduled but are not currently molding
   const [scheduledOrders] = useState(
     arm.id === 62 ? enhanced_arm_loadqueue_62_response.objects : []
   );
@@ -145,15 +142,18 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
     ...scheduledOrders.map((ord) => normalizeOrder(ord)),
   ]);
 
-  // The final list of items that are scheduled on this arm
+  // The final list of items that are scheduled on this arm. We grab their start dates based off
+  // the priority queue of "load-after" fields.
   const [allScheduledArmOrders] = useState(
     getOrdersWithStartDates(allNormalizedOrders)
   );
 
-  // Create a new store based off the data in unqueuedItems
+  // Create a new unassigned store based off the data in unqueuedItems. We create it here so we can
+  // espose its methods to the Scheduler component. This is the drawback of having to create our own
+  // implementation of drag-and-drop
   const [unassignedStore] = useState(
     new UnassignedStore({
-      data: unqueuedItems.map((item: any) => new Order(item)),
+      data: unqueuedItems,
     })
   );
 
@@ -164,8 +164,7 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   const onUnassignedStoreAdd = useCallback(
     (props: any) => {
       const { records } = props;
-      const flatData = records.map((rec: any) => rec.originalData);
-      // const currentUnassignedItems = unassignedStore.getRecords();
+      const flatData: any[] = records.map((rec: any) => rec.originalData);
       setUnqueuedItems([...unqueuedItems, ...flatData]);
     },
     [unqueuedItems]
@@ -188,13 +187,39 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
     [unqueuedItems]
   );
 
+  /**
+   * @param {String} action string representing the action that fired onUpdate
+   * @param {Object} changes Object with three arrays: added, removed, and modified
+   * This function is called when the unassignedStore.revertChanges() fun is called
+   */
+  const onUnassignedStoreRevert = useCallback(
+    (props: any) => {
+      const { action, changes } = props;
+      if (action === "clearchanges") {
+        const toAdd = changes.removed.map((obj: any) => obj.data);
+        const idsToRemove = changes.added.map((obj: any) => obj.data.id);
+        const newState = [...unqueuedItems, ...toAdd].filter(
+          (item: any) => !idsToRemove.includes(item.id)
+        );
+        setUnqueuedItems(newState);
+      }
+    },
+    [unqueuedItems]
+  );
+
   useEffect(() => {
-    // Bind callbacks for adding and removing items from the unassigned store.
+    // Bind callbacks for adding, removing, and reverting items from the unassigned store.
     Object.assign(unassignedStore, {
       onAdd: onUnassignedStoreAdd,
       onRemove: onUnassignedStoreRemove,
+      onRefresh: onUnassignedStoreRevert,
     });
-  }, [unassignedStore, onUnassignedStoreAdd, onUnassignedStoreRemove]);
+  }, [
+    unassignedStore,
+    onUnassignedStoreAdd,
+    onUnassignedStoreRemove,
+    onUnassignedStoreRevert,
+  ]);
 
   return (
     <Accordion
@@ -215,73 +240,22 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
         </Typography>
       </AccordionSummary>
       <AccordionDetails>
-        {/* Info about the arm and orders that are currently molding */}
+        {/* Info about the arm and orders that are currently molding. Not necessary for integration */}
         <ArmDetail moldingArmOrders={moldingArmOrders} />
-        {/* The actual scheduler component for the arm */}
-        {/* To-Do: Page will break if dragContainer ref is passed undefined. Add elegant handling if it's not passed.  */}
+        {/* The scheduler component for the arm */}
         <ArmScheduler
           armId={arm.id}
           unassignedStore={unassignedStore}
           dragContainer={dragContainer}
           scheduledArmOrders={allScheduledArmOrders}
+          readOnly={false}
         />
         {/* The draggable list of items that are scheduled to the arm but aren't scheduled on the scheduler yet */}
-        <CustomDragContainer armId={arm.id} forwardRef={dragContainer}>
+        <CustomDragContainer armId={arm.id} dragContainerRef={dragContainer}>
           <UnassignedTable rows={unqueuedItems} />
         </CustomDragContainer>
       </AccordionDetails>
     </Accordion>
-  );
-};
-
-interface ArmDetailProps {
-  moldingArmOrders: any[];
-}
-/**
- *
- * @param {loadedArmOrders} any[] Orders that are currently molding
- */
-const ArmDetail: FC<ArmDetailProps> = ({ moldingArmOrders }) => {
-  return (
-    <Fragment>
-      <Box sx={{ backgroundColor: "lime", height: "30px" }}></Box>
-      <Box sx={{ display: "flex" }}>
-        {moldingArmOrders.map((loadedOrder: any, i: number) => (
-          <Box
-            p={1}
-            key={i}
-            className={"loadedOrderInArm"}
-            sx={{
-              marginRight: i === moldingArmOrders.length - 1 ? "0px" : "2.5px",
-            }}
-          >
-            <Typography variant={"body2"}>Item: {loadedOrder.item}</Typography>
-            <Typography variant={"body2"}>
-              Description: {loadedOrder.description}
-            </Typography>
-            <Typography variant={"body2"}>
-              Order: {loadedOrder.number}
-            </Typography>
-            <Typography variant={"body2"}>
-              Quantity: {loadedOrder.balance}
-            </Typography>
-          </Box>
-        ))}
-        <Box
-          p={1}
-          className={"loadedOrderInArm"}
-          sx={{
-            margin: "2.5px, 0",
-            marginRight: "0px",
-            marginLeft: moldingArmOrders.length === 0 ? "0px" : "2.5px",
-            backgroundColor: "rgb(54, 215, 183)",
-            minHeight: "80px",
-          }}
-        >
-          <Typography variant={"body2"}>123 Available</Typography>
-        </Box>
-      </Box>
-    </Fragment>
   );
 };
 
