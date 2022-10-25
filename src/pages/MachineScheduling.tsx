@@ -20,6 +20,7 @@ import CustomDragContainer from "../components/SchedulerDragContainer";
 import UnassignedStore from "../lib/UnassignedStore";
 import Order from "../lib/Order";
 import { machines_response } from "../data/machines";
+import { unloadedOrders } from "../data/sample-data";
 import { machine_display_response } from "../data/machine-display";
 import { enhanced_arm_loadqueue_62_response } from "../data/arm-enhanced-loadqueue";
 import {
@@ -34,7 +35,7 @@ import {
 
 const MachineScheduling = () => {
   // Using state hook because I'm assuming this data will be set in a useEffect later
-  const [machines, setMachines] = useState(machines_response.machines);
+  const [machines] = useState(machines_response.machines);
   // useEffect(() => {
   //   const response = ...
   //   setMachines(response.machines)
@@ -46,7 +47,6 @@ const MachineScheduling = () => {
       {machines.map((machine: any, i: number) => (
         <MachineAccordion key={`machine-schedule-${i}`} machine={machine} />
       ))}
-      {/* <Typography variant="h5">Unassigned Orders</Typography> */}
     </Box>
   );
 };
@@ -58,16 +58,20 @@ const MachineAccordion: FC<MachineAccordionProps> = ({ machine }) => {
   // Use the machine.id to query for the machine-display. In this case, we only have one machine (19) but
   // the query would go here.
 
-  // Recommendation: machine-display-response returns an object with arms[] and orders[]. I would recommend that the orders[]
-  // be nested inside each entry in arms[]. Unless all the orders for a machine are used for something completely independent of
-  // the parent arm- we can avoid unecessary computation by nesting them as a direct child.
+  // Recommendation: machine-display-response returns an object with arms[] and orders[]. I would recommend that the
+  // orders[] be nested inside each entry in arms[]. Unless all the orders for a machine are used for something
+  // completely independent of the parent arm- we can avoid unecessary computation by nesting them as a direct child.
+
+  // Important: When I nest the orders under each arm, I'm adding a flag to each order to tell the scheduler the order
+  // is current molding.
   const armsWithOrders = machine_display_response.arms.map((arm: any) => ({
     ...arm,
     orders: machine_display_response.orders
       .map((order: any) => ({ ...order, item_currently_molding: true }))
       .filter((order: any) => order.arm === arm.id),
   }));
-  const [machineArms, setMachineArms] = useState(armsWithOrders);
+
+  const [machineArms] = useState(armsWithOrders);
 
   return (
     <Accordion
@@ -96,10 +100,11 @@ const MachineAccordion: FC<MachineAccordionProps> = ({ machine }) => {
             />
           );
         })}
-        {/* This is the list of all items on the machine */}
+        {/* This is the list of all items on the machine. We can ignore this for integration. */}
         <Typography variant="h6" mt={2}>
           Machine Orders
         </Typography>
+        <UnassignedTable rows={unloadedOrders} />
       </AccordionDetails>
     </Accordion>
   );
@@ -116,10 +121,10 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   index,
   moldingArmOrders,
 }) => {
-  // Make a new ref for the drag container
+  // Required: Make a new ref for the external drag container (MUI table with assigned orders)
   const dragContainer = useRef(null);
 
-  // This represents all of the orders tht are scheduled but are not molding
+  // This represents all of the orders tht are scheduled but are not currently molding
   const [scheduledOrders] = useState(
     arm.id === 62 ? enhanced_arm_loadqueue_62_response.objects : []
   );

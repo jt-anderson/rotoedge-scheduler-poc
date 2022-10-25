@@ -2,7 +2,6 @@
  * Application configuration
  */
 import { SchedulerConfig } from "@bryntum/scheduler";
-import myViewPreset from "./SchedulerTimeConfig";
 import { DateHelper } from "@bryntum/scheduler";
 
 /****** Global Variables *******/
@@ -27,22 +26,18 @@ const WORKING_END_HOUR = 17; // 5:00 PM
 
 const schedulerConfig: Partial<SchedulerConfig> = {
   startDate: START_DATE,
-  endDate: END_DATE,
+  // endDate: END_DATE,
   // https://www.bryntum.com/docs/scheduler/api/Scheduler/view/TimelineBase#config-workingTime
-  workingTime: {
-    fromDay: ONLY_WORKING_HOURS ? WORKING_START_DAY : undefined,
-    toDay: ONLY_WORKING_HOURS ? WORKING_END_DAY : undefined,
-    fromHour: ONLY_WORKING_HOURS ? WORKING_START_HOUR : undefined,
-    toHour: ONLY_WORKING_HOURS ? WORKING_END_HOUR : undefined,
-  },
-  viewPreset: "defaultPreset",
-  presets: [myViewPreset],
-
+  // workingTime: {
+  //   fromDay: ONLY_WORKING_HOURS ? WORKING_START_DAY : undefined,
+  //   toDay: ONLY_WORKING_HOURS ? WORKING_END_DAY : undefined,
+  //   fromHour: ONLY_WORKING_HOURS ? WORKING_START_HOUR : undefined,
+  //   toHour: ONLY_WORKING_HOURS ? WORKING_END_HOUR : undefined,
+  // },
   rowHeight: ROW_HEIGHT,
   barMargin: ROW_MARGIN,
   multiEventSelect: true,
   autoHeight: true,
-  // timeRangesFeature: true,
 };
 
 export {

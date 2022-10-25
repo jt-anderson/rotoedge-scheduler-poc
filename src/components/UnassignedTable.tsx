@@ -34,7 +34,6 @@ const UnassignedTable: React.FC<UnassignedStoreProps> = (props) => {
             <TableRow
               key={row.name}
               className="scheduler-unplanned-item"
-              //   sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
               data-id={row.id}
               sx={{ backgroundColor: "#3598dc" }}
             >

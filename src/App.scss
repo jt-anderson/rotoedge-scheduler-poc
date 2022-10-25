@@ -142,3 +142,15 @@ html {
 .scheduler-header-cell:last-child {
   border-right: none;
 }
+
+#view-preset-select {
+  padding-right: 10 !important;
+  padding-top: 5px !important;
+  padding-left: 15px !important;
+  padding-bottom: 5px !important;
+}
+
+.view-preset-shift-button {
+  background-color: red;
+  border: solid 1px red;
+}

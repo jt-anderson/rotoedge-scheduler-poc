@@ -1,12 +1,6 @@
-/**
- * Custom Task store
- *
- * Taken from the original dragfromgrid example
- */
 import { DateHelper, EventStore } from "@bryntum/scheduler";
 import Order from "./Order.js";
 import { getEventAdjustedDuration, cleanupResources } from "./Util";
-import { ONLY_WORKING_HOURS } from "./SchedulerConfig";
 
 export default class OrderStore extends EventStore {
   static get defaultConfig() {
@@ -27,17 +21,10 @@ export default class OrderStore extends EventStore {
       records = [records];
     }
 
-    // If we only allow working hours, adjust the task duration
-    // if (ONLY_WORKING_HOURS) {
-    //   this.adjustTaskDuration(records);
-    // }
-
     super.add(records, silent);
 
-    // if (me.autoRescheduleTasks) {
     me.endBatch();
     me.isRescheduling = false;
-    // }
   }
 
   // Auto called when triggering the update event.
@@ -135,89 +122,14 @@ export default class OrderStore extends EventStore {
       const newEndDateMs = event2.duration + Date.parse(newStartDate);
       const newEndDate = new Date(newEndDateMs);
       event2.startDate = newStartDate;
-      // event2.setEndDate(newEndDate, true);
-
-      //   ev.endDate = newEndDate;
+      event2.setEndDate(newEndDate, true);
     }
   }
 
-  // rescheduleOverlappingTasks(eventRecord) {
-  //   if (eventRecord.resource) {
-  //     const futureEvents = [],
-  //       earlierEvents = [];
-
-  //     // Split tasks into future and earlier tasks
-  //     eventRecord.resource.events.forEach((event) => {
-  //       // if (event !== eventRecord) {
-  //       if (event.data.id !== eventRecord.data.id) {
-  //         if (event.startDate >= eventRecord.startDate) {
-  //           futureEvents.push(event);
-  //         } else {
-  //           earlierEvents.push(event);
-  //         }
-  //       }
-  //     });
-
-  //     if (futureEvents.length || earlierEvents.length) {
-  //       futureEvents.sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
-  //       earlierEvents.sort((a, b) => (a.startDate > b.startDate ? -1 : 1));
-
-  //       futureEvents.forEach((ev, i) => {
-  //         const prev = futureEvents[i - 1] || eventRecord;
-
-  //         ev.startDate = DateHelper.max(prev.endDate, ev.startDate);
-  //       });
-
-  //       // Walk backwards and remove any overlap
-  //       [eventRecord, ...earlierEvents].forEach((ev, i, all) => {
-  //         const prev = all[i - 1];
-  //         //   const tempNowDate = new Date(2022, 2, 20, 8);
-  //         // && ev.endDate > tempNowDate
-  //         // ev.endDate > Date.now() &&
-  //         if (ev !== eventRecord && prev) {
-  //           ev.setEndDate(DateHelper.min(prev.startDate, ev.endDate), true);
-  //         }
-  //       });
-  //       this.isRescheduling = false;
-  //     }
-  //   }
-  // }
-
   adjustTaskDuration(events) {
     events.forEach((event) => {
-      const startDate = event.startDate;
-      // Get end date based off the events original duration (not adjusted)
-      const endDateMs = event.scheduled_duration + Date.parse(startDate);
-      const endDate = new Date(endDateMs);
-
-      // const nonWorkingDaysDict = DateHelper.nonWorkingDays;
-      // const nonWorkingDays = Object.keys(nonWorkingDaysDict).map((dow) => +dow);
-
-      // const durationInHours = DateHelper.getDurationInUnit(
-      //   startDate,
-      //   endDate,
-      //   "hour"
-      // );
-
       const totalDaysFilledInMs = getEventAdjustedDuration(event);
       event.duration += totalDaysFilledInMs;
-
-      // return {
-      //   ...event,
-      //   originalData: { ...event.originalData, color: "red" },
-      // };
-
-      // get the day of the week [0-6], 0 = Sunday, etc...
-      // let iteratedDay = startDate;
-      // while (!nonWorkingDays.includes(iteratedDay.getDay())) {
-      //   nonWorkingDays.includes(iteratedDay.getDay());
-      //   iteratedDay = DateHelper.getStartOfNextDay(iteratedDay);
-      // }
-
-      // // get hour of day
-      // const hourOfDay = DateHelper.format(endDate, "HH.mm");
-      // const hourOfDayToFloat = parseFloat(hourOfDay);
-      // const test = false;
     });
   }
 }

@@ -9,7 +9,7 @@ import {
 } from "./SchedulerConfig";
 
 // The orders that are CURRENTLY MOLDING have a different structure returned than the
-// the enhanced-loadqueue... So I guess we'll normalize them temporarily
+// the enhanced-loadqueue
 const normalizeOrder = (order: any) => ({
   ...order,
   item_takt: order.takt,
@@ -17,8 +17,8 @@ const normalizeOrder = (order: any) => ({
 });
 
 // Helper function that adds the Scheduler's required fields to the order object. We want
-// to avoid creating as much unecessary data as possible.
-const mapToOrderModel = (orders: any, previousEndDate = new Date()) => {
+// to avoid storing as much unecessary data as possible.
+const mapToOrderModel = (orders: any) => {
   return orders.map((order: any) => ({
     ...order,
     duration: DateHelper.asMilliseconds(
@@ -29,14 +29,18 @@ const mapToOrderModel = (orders: any, previousEndDate = new Date()) => {
     name: `WO: ${order.work_order_number} (${order.balance} Parts) `,
     draggable: order.item_currently_molding ? false : true,
     previousLoadOrder: order.load_after ? order.load_after.split(";")[0] : null,
+    resizable: false,
   }));
 };
 
 // Helper function that will return a flat array of orders with their start dates. We use the
 // priority queue to sync orders to start when their parent order ends
 const getOrdersWithStartDates = (allOrders: any) => {
-  console.log("hmm");
-  // Get all orders into a temp dictionary based off their respective resource groups
+  /**
+   * @Description Get all orders into a temp dictionary based off their respective resource groups.
+   * @Key ResourceGroupId
+   * @Value Order[]
+   */
   const ordersByResourceGroups = allOrders.reduce(
     (resourceDict: any, order: any, index: number) => {
       if (!resourceDict[order.scheduled_resource_id]) {
@@ -128,11 +132,11 @@ const getEventAdjustedDuration = (event: any) => {
   return event.duration + totalDaysFilledInMs;
 };
 
-/**
- * @param resourceStore
- */
+// Helper function to remove resources that have no events in them- except for the last resource
+// in the scheduler. We leave the last row as empty to allow new rows to be dragged.
 const cleanupResources = (resourceStore: any) => {
   const resourceIdMap = resourceStore.idMap;
+  const toDelete: any = [];
   Object.keys(resourceIdMap).forEach((resourceId) => {
     const resourceDetail = resourceIdMap[resourceId];
     const resourceEvents = resourceDetail.record.events;
@@ -141,9 +145,11 @@ const cleanupResources = (resourceStore: any) => {
       resourceEvents.length === 0 && // There are no events in this resource
       resourcesCount - 1 !== resourceDetail.index // Its not the last row
     ) {
-      resourceStore.remove(resourceId);
+      // resourceStore.remove(resourceId);
+      toDelete.push(resourceId);
     }
   });
+  resourceStore.remove(toDelete);
 };
 
 export {

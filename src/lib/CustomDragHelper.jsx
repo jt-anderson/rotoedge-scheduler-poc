@@ -1,11 +1,5 @@
-import {
-  DateHelper,
-  DragHelper,
-  DomHelper,
-  ResourceModel,
-} from "@bryntum/scheduler";
+import { DateHelper, DragHelper, DomHelper } from "@bryntum/scheduler";
 import { ROW_HEIGHT, ROW_MARGIN, ONLY_WORKING_HOURS } from "./SchedulerConfig";
-import { getEventAdjustedDuration } from "./Util";
 
 export default class Drag extends DragHelper {
   static get defaultConfig() {
@@ -37,7 +31,7 @@ export default class Drag extends DragHelper {
   }
 
   onTaskDragStart({ context }) {
-    // assign 'this' to variable me for easy access
+    // assign 'this' to variable 'me' for easy access
     const me = this,
       // destructure schedule
       { schedule } = me,
@@ -55,17 +49,12 @@ export default class Drag extends DragHelper {
     // If we can't identify the task, don't allow the item to be dragged (this might occur for a couple
     // of reasons). the dragged item could not be identified in the store so make sure:
     // 1. the draggable item has a container with a data attribute ('data-id') of the item's ID
-    // 2. the CustomDrag class has an object called 'store' and that object has an array called 'unqueuedItems'
-    // which is correctly populated with the data of items that can be dragged.
+    // 2. the CustomDrag class has an object called 'unassignedStore' which is correctly populated with
+    // the data store of items of assigned but unscheduled orders to that arm.
     if (task === undefined) {
       // task not found
       return;
     }
-
-    // if (ONLY_WORKING_HOURS) {
-    //   const newDuration = getEventAdjustedDuration(task);
-    //   task.duration = newDuration;
-    // }
 
     // we know the task exists so calculate the width and height of the bar
     const newHeight = ROW_HEIGHT - ROW_MARGIN * 2,
@@ -78,17 +67,12 @@ export default class Drag extends DragHelper {
 
     // mutate dragged element (grid row) into an event bar
     proxy.classList.remove("b-grid-row");
-    // proxy.classList.add("b-sch-event-wrap");
-    // proxy.classList.add("b-sch-event");
     proxy.classList.add("b-unassigned-class");
     proxy.classList.add("custom-dragged-element");
     proxy.classList.add(`b-${schedule.mode}`);
     proxy.innerHTML = `${task.name}`;
     proxy.style.height = `${newHeight}px`;
     proxy.style.width = `${newWidth}px`;
-
-    const { clientY, elementStartY, pageY, scrollY, startClientY, startPageY } =
-      context;
 
     // update context x and y values based on where we clicked + the height / width of data bar (which is calculated
     // based off the duration of the event)
@@ -142,7 +126,6 @@ export default class Drag extends DragHelper {
       target = context.target;
 
     // If drop was done in a valid location, set the startDate and transfer the task to the Scheduler event store
-    // if (context.valid && target) {
     if (context.valid && target) {
       // ---------------- CREATING NEW EVENT ---------------------
       const date = me.schedule.getDateFromCoordinate(

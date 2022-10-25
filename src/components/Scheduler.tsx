@@ -4,9 +4,14 @@ import React, {
   useState,
   FC,
   Fragment,
+  useEffect,
 } from "react";
-import { BryntumScheduler } from "@bryntum/scheduler-react";
-import { DateHelper } from "@bryntum/scheduler";
+import {
+  BryntumScheduler,
+  BryntumButton,
+  BryntumCombo,
+} from "@bryntum/scheduler-react";
+import { DateHelper, PresetManager, PresetStore } from "@bryntum/scheduler";
 import { schedulerConfig } from "../lib/SchedulerConfig";
 import OrderStore from "../lib/OrderStore.js";
 import Dialog from "@mui/material/Dialog";
@@ -16,6 +21,14 @@ import Divider from "@mui/material/Divider";
 import Button from "@mui/material/Button";
 import { BryntumDateTimeField } from "@bryntum/scheduler-react";
 import { cleanupResources } from "../lib/Util";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import FormControl from "@mui/material/FormControl";
+import Select, { SelectChangeEvent } from "@mui/material/Select";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import IconButton from "@mui/material/IconButton";
+import { customPresets } from "../lib/SchedulerTimeConfig";
 
 /**
  * @param {any[]} orders Array of orders that are placed on Scheduler
@@ -91,7 +104,23 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     setHardBreaks([]);
   };
 
-  // console.log("hardBreaks", hardBreaks);
+  useEffect(() => {
+    // Add custom time presets to PresetManager once when page loads
+    PresetManager.add(customPresets);
+  }, [customPresets]);
+
+  const [activePreset, setActivePreset] = useState("oneWeekPreset");
+
+  const handlePresetChange = (e: any) => {
+    const presetId = e.target.value;
+    forwardRef.current.instance.zoomTo({
+      preset: presetId,
+      startDate: new Date(),
+      endDate: new Date(),
+    });
+
+    setActivePreset(presetId);
+  };
 
   return (
     <Box flexDirection="column" className="flex-grow">
@@ -102,15 +131,13 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
           events={orders}
           resources={resources}
           timeRanges={hardBreaks}
+          viewPreset={activePreset}
+          presets={customPresets}
           onTimeRangeHeaderClick={() => {
             console.log("onTimeRangeHeaderClick clicked");
           }}
-          onTimeRangeHeaderContextMenu={() => {
-            console.log("onTimeRangeHeaderContextMenu clicked");
-          }}
           crudManager={{
             eventStore: scheduledStore,
-            // resourceStore: resourceStore,
             autoLoad: true,
           }}
           eventRenderer={(config: any) => {
@@ -124,136 +151,111 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             const { work_order_number, balance } = eventRecord;
             return `WO: ${work_order_number} (${balance} Parts)`;
           }}
-          features={{
-            timeRanges: {
-              showCurrentTimeLine: {
-                name: "Now",
-              },
-              showHeaderElements: true,
-              enableResizing: true,
-              showTooltip: true,
-              // tooltipTemplate({ timeRange }) {
-              //   return `${timeRange.name}`;
-              // },
+          timeRangesFeature={{
+            showCurrentTimeLine: {
+              name: "Now",
             },
-            timeAxisHeaderMenu: {
-              items: {
-                zoomLevel: false,
-              },
-            },
-            eventEdit: false,
-            eventDragCreate: {
-              disabled: true,
-            },
-            eventDrag: {
-              // Allow dragging events outside of the Scheduler
-              constrainDragToTimeline: false,
-              // With this method, you can let the scheduler now if the drop operation is valid or not
-              //   validatorFn({ draggedRecords: any, event: any }) {
-              // validatorFn(res: any) {
-              //   if (!res.valid) {
-              //     console.log("not vlaid!");
-              //   }
-              // },
-
-              // This CSS selector defines where a user may drop events outside the scheduler element
-              externalDropTargetSelector: "#unqueuedItemsContainer",
-            },
-            eventMenu: {
-              items: {
-                copyEvent: false,
-                cutEvent: false,
-                deleteEvent: false,
-                unassign: {
-                  icon: null,
-                  text: "Unassign",
-                  weight: 300,
-                  onItem: (config: any) => {
-                    scheduledStore.remove(config.eventRecord);
-                    unassignedStore.add(config.eventRecord);
-                    cleanupResources(forwardRef.current.instance.resourceStore);
-                  },
-                },
-                moveForward: {
-                  text: "Move 1 Day Ahead",
-                  cls: "b-separator", // Add a visual line above the item
-                  weight: 400, // Add the item to the bottom
-                  onItem: (config: any) => {
-                    config.eventRecord.shift(1, "day");
-                  },
-                },
-                eventDetails: {
-                  text: "See Order Details",
-                  weight: 400, // Add the item to the bottom
-                  onItem: (config: any) => {
-                    setEventDetailOpen(true);
-                    setEventDetail(config.eventRecord);
-                  },
-                },
-              },
-              processItems: (config: any) => {
-                const { eventRecord, items } = config;
-                if (!eventRecord.draggable) {
-                  items.moveForward = false;
-                  items.unassign = false;
-                }
-              },
-            },
-            scheduleMenu: {
-              // The Schedule menu is created, but starts disabled
-              disabled: true,
-            },
-            timeAxisHeaderMenu: {
-              // The TimeAxis Header menu is created, but starts disabled
-              // disabled: true,
-              items: {
-                eventsFilter: false,
-                zoomLevel: false,
-                dateRange: false,
-                currentTimeLine: false,
-                removeHardBreak: {
-                  text: "Remove Hard Break",
-                  weight: 400, // Add the item to the bottom
-                  onItem: (config: any) => {
-                    const popHardBreak = hardBreaks.slice(
-                      0,
-                      hardBreaks.length - 1
-                    );
-                    // console.log("popHardBreak", popHardBreak);
-                    setHardBreaks(popHardBreak);
-                  },
-                },
-              },
-              processItems: (config: any) => {
-                const { targetElement } = config;
-                const timeRangeClasslist = targetElement?.classList;
-                const timeRangeParentClasslist =
-                  targetElement?.parentElement?.classList;
-                if (
-                  timeRangeClasslist &&
-                  timeRangeParentClasslist &&
-                  (timeRangeClasslist.value.includes("timerange") ||
-                    timeRangeParentClasslist.value.includes("timerange"))
-                ) {
-                  // We don't want to do anything :)
-                } else {
-                  config.items.removeHardBreak = false;
-                }
-              },
-            },
-            // timeRangeHeaderMenu: {
-            //   items: {
-            //     moveForward: {
-            //       text: "Move 1 Day Ahead",
-            //       cls: "b-separator", // Add a visual line above the item
-            //       weight: 400, // Add the item to the bottom
-            //       onItem: (config: any) => {
-            //         // config.eventRecord.shift(1, "day");
-            //         console.log("hm");
-            //       },
-            //     },
-            //   },
+            showHeaderElements: true,
+            enableResizing: true,
+            showTooltip: true,
+            // tooltipTemplate({ timeRange }) {
+            //   return `${timeRange.name}`;
             // },
+          }}
+          eventEditFeature={false}
+          eventDragCreateFeature={{ disabled: true }}
+          eventDragFeature={{
+            // Allow dragging events outside of the Scheduler
+            constrainDragToTimeline: false,
+            // With this method, you can let the scheduler now if the drop operation is valid or not
+            //   validatorFn({ draggedRecords: any, event: any }) {
+            // validatorFn(res: any) {
+            //   if (!res.valid) {
+            //     console.log("not vlaid!");
+            //   }
+            // },
+
+            // This CSS selector defines where a user may drop events outside the scheduler element
+            externalDropTargetSelector: "#unqueuedItemsContainer",
+          }}
+          eventMenuFeature={{
+            items: {
+              copyEvent: false,
+              cutEvent: false,
+              deleteEvent: false,
+              unassign: {
+                icon: null,
+                text: "Unassign",
+                weight: 300,
+                onItem: (config: any) => {
+                  scheduledStore.remove(config.eventRecord);
+                  unassignedStore.add(config.eventRecord);
+                  cleanupResources(forwardRef.current.instance.resourceStore);
+                },
+              },
+              moveForward: {
+                text: "Move 1 Day Ahead",
+                cls: "b-separator", // Add a visual line above the item
+                weight: 400, // Add the item to the bottom
+                onItem: (config: any) => {
+                  config.eventRecord.shift(1, "day");
+                },
+              },
+              eventDetails: {
+                text: "See Order Details",
+                weight: 400, // Add the item to the bottom
+                onItem: (config: any) => {
+                  setEventDetailOpen(true);
+                  setEventDetail(config.eventRecord);
+                },
+              },
+            },
+            processItems: (config: any) => {
+              const { eventRecord, items } = config;
+              if (!eventRecord.draggable) {
+                items.moveForward = false;
+                items.unassign = false;
+              }
+            },
+          }}
+          scheduleMenuFeature={{ disabled: true }}
+          timeAxisHeaderMenuFeature={{
+            // The TimeAxis Header menu is created, but starts disabled
+            // disabled: true,
+            items: {
+              eventsFilter: false,
+              zoomLevel: false,
+              dateRange: false,
+              currentTimeLine: false,
+              removeHardBreak: {
+                text: "Remove Hard Break",
+                weight: 400, // Add the item to the bottom
+                onItem: (config: any) => {
+                  const popHardBreak = hardBreaks.slice(
+                    0,
+                    hardBreaks.length - 1
+                  );
+                  // console.log("popHardBreak", popHardBreak);
+                  setHardBreaks(popHardBreak);
+                },
+              },
+            },
+            processItems: (config: any) => {
+              const { targetElement } = config;
+              const timeRangeClasslist = targetElement?.classList;
+              const timeRangeParentClasslist =
+                targetElement?.parentElement?.classList;
+              if (
+                timeRangeClasslist &&
+                timeRangeParentClasslist &&
+                (timeRangeClasslist.value.includes("timerange") ||
+                  timeRangeParentClasslist.value.includes("timerange"))
+              ) {
+                // We don't want to do anything :)
+              } else {
+                config.items.removeHardBreak = false;
+              }
+            },
           }}
           listeners={{
             // We listen for the `eventDrop` event and take action if dropped on the external grid
@@ -271,32 +273,62 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
           {...schedulerConfig}
         />
       </div>
-      <Box mt={1} display="flex" justifyContent="flex-end">
-        <Button
-          variant="outlined"
-          size={"small"}
-          sx={{ display: "flex", marginRight: 1 }}
-          color="info"
-          onClick={() => setAddHardBreakOpen(true)}
-        >
-          Add Hard Break
-        </Button>
-        <Button
-          variant="outlined"
-          size={"small"}
-          sx={{ display: "flex", marginRight: 1 }}
-        >
-          Save Changes
-        </Button>
-        <Button
-          variant="outlined"
-          size={"small"}
-          sx={{ display: "flex" }}
-          color="error"
-          onClick={cancelChanges}
-        >
-          Discard Changes
-        </Button>
+      <Box mt={1} display="flex" justifyContent="space-between">
+        <Box display={"flex"}>
+          <IconButton
+            size={"small"}
+            sx={{ display: "flex" }}
+            color="primary"
+            onClick={() => forwardRef.current.instance.shiftPrevious()}
+          >
+            <ChevronLeftIcon />
+          </IconButton>
+          <ViewPresetDropdown
+            selectedPreset={activePreset}
+            presets={customPresets}
+            handleChange={handlePresetChange}
+          />
+          <IconButton
+            size={"small"}
+            sx={{ display: "flex" }}
+            color="primary"
+            onClick={() => forwardRef.current.instance.shiftNext()}
+          >
+            <ChevronRightIcon />
+          </IconButton>
+          {/* <BryntumButton
+          icon="b-fa-angle-right"
+          tooltip="View next day"
+          onClick={() => forwardRef.current.instance.shiftNext()}
+        /> */}
+        </Box>
+        <Box display={"flex"}>
+          <Button
+            variant="outlined"
+            size={"small"}
+            sx={{ display: "flex", marginRight: 1 }}
+            color="info"
+            onClick={() => setAddHardBreakOpen(true)}
+          >
+            Add Hard Break
+          </Button>
+          <Button
+            variant="outlined"
+            size={"small"}
+            sx={{ display: "flex", marginRight: 1 }}
+          >
+            Save Changes
+          </Button>
+          <Button
+            variant="outlined"
+            size={"small"}
+            sx={{ display: "flex" }}
+            color="error"
+            onClick={cancelChanges}
+          >
+            Discard Changes
+          </Button>
+        </Box>
       </Box>
       <EventDetailDialog
         closeEventDetail={closeEventDetailDialog}
@@ -413,7 +445,7 @@ const AddHardBreakDialog: FC<AddHardBreakDialogProps> = ({
           size={"small"}
           sx={{ display: "flex", marginTop: 4 }}
           onClick={() => {
-            const value = dateTimeRef?.current?.instance.value;
+            const value = dateTimeRef.current?.instance.value;
             if (value) {
               onSave({ startDate: value });
             }
@@ -424,6 +456,39 @@ const AddHardBreakDialog: FC<AddHardBreakDialogProps> = ({
         </Button>
       </Box>
     </Dialog>
+  );
+};
+
+interface ViewPresetDropdownProps {
+  handleChange: any;
+  presets: any[];
+  selectedPreset: any;
+}
+const ViewPresetDropdown: FC<ViewPresetDropdownProps> = ({
+  handleChange,
+  presets,
+  selectedPreset,
+}) => {
+  return (
+    <Box sx={{ minWidth: 150 }}>
+      <FormControl fullWidth>
+        <InputLabel id="demo-simple-select-label">Zoom</InputLabel>
+        <Select
+          labelId="demo-simple-select-label"
+          id="view-preset-select"
+          value={selectedPreset}
+          label="Zoom"
+          onChange={handleChange}
+          sx={{ marginRight: 1, marginLeft: 1 }}
+        >
+          {presets.map((preset: any, i: number) => (
+            <MenuItem key={i} value={preset.id}>
+              {preset.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
   );
 };
 

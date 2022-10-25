@@ -1,10 +1,11 @@
 import { EventModel } from "@bryntum/scheduler";
 
 export default class Order extends EventModel {
+  // For all orders, we can set default values with this method.
   static get defaults() {
     return {
       durationUnit: "ms",
-      resizable: false,
+      // resizable: false,
     };
   }
 
