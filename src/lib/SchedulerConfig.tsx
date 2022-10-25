@@ -1,6 +1,3 @@
-/**
- * Application configuration
- */
 import { SchedulerConfig } from "@bryntum/scheduler";
 import { DateHelper } from "@bryntum/scheduler";
 

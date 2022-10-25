@@ -162,10 +162,15 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
           readOnly={readOnly}
           events={events}
           resources={resources}
-          // timeRanges={hardBreaks}
+          createEventOnDblClick={false}
+          zoomOnTimeAxisDoubleClick={false}
           viewPreset={activePreset}
           presets={customPresets}
+          eventEditFeature={false}
+          eventDragCreateFeature={{ disabled: true }}
+          scheduleMenuFeature={{ disabled: true }}
           crudManager={{
+            validateResponse: true,
             eventStore: scheduledStore,
             timeRangeStore: hardBreakStore,
             autoLoad: true,
@@ -186,15 +191,10 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             enableResizing: true,
             showTooltip: true,
             callOnFunctions: true,
-            onClick() {
-              console.log("sdjhsdkfhjksdfhkjsd");
-            },
             // tooltipTemplate({ timeRange }) {
             //   return `${timeRange.name}`;
             // },
           }}
-          eventEditFeature={false}
-          eventDragCreateFeature={{ disabled: true }}
           eventDragFeature={{
             // Allow dragging events outside of the Scheduler
             constrainDragToTimeline: false,
@@ -249,7 +249,6 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               }
             },
           }}
-          scheduleMenuFeature={{ disabled: true }}
           timeAxisHeaderMenuFeature={{
             // The TimeAxis Header menu is created, but starts disabled
             // disabled: true,
@@ -280,8 +279,6 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             },
           }}
           listeners={{
-            // We listen for the `eventDrop` event and take action if dropped on the external grid
-            // eventDrop({ browserEvent, eventRecords, externalDropTarget }) {
             eventDrop(res: any) {
               console.log("drop event", res);
               const { browserEvent, eventRecords, externalDropTarget } = res;
@@ -319,6 +316,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             <ChevronRightIcon />
           </IconButton>
         </Box>
+        {/* If readOnly is false, include toolbar to edit rows */}
         {!readOnly && (
           <Box display={"flex"}>
             <Button
@@ -360,8 +358,6 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
         open={addHardBreakOpen}
         onSave={addHardBreakLine}
       />
-
-      {/* If readOnly is false, include toolbar to edit rows */}
     </Box>
   );
 };

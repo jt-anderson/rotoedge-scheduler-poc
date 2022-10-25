@@ -30,6 +30,7 @@ export default class OrderStore extends EventStore {
   // Auto called when triggering the update event.
   // Reschedule if the update caused the event to overlap any others.
   onUpdate({ record }) {
+    console.log("record", record);
     if (!this.isRescheduling && record && record.resource !== undefined) {
       this.rescheduleOverlappingTasks(record);
     }
@@ -45,7 +46,7 @@ export default class OrderStore extends EventStore {
       const resourcesCount = Object.keys(resourceIdMap).length;
 
       // To-Do: We should combine both of these processes so there's no 'flicker' when you
-      // add and remove orders. However, we have to be careful to handle multi-order selection.
+      // add and remove orders. However, we have to be careful to still handle multi-order selection.
       // This approach handles multi-select but it's kind of brute force. I think we could add
       // a condition in the if statement to check how many rows are empty and prevent the addition
       // of a new resource.
@@ -105,8 +106,8 @@ export default class OrderStore extends EventStore {
     const e2start = event2.startDate;
     const e2end = event2.endDate;
     return (
-      (e1start >= e2start && e1start < e2end) ||
-      (e2start >= e1start && e2start < e1end)
+      (e1start > e2start && e1start <= e2end) ||
+      (e2start > e1start && e2start <= e1end)
     );
   }
 
@@ -119,9 +120,8 @@ export default class OrderStore extends EventStore {
   shiftEvents(event1, event2) {
     if (event1 && this.doEventsOverlap(event1, event2)) {
       const newStartDate = event1.endDate;
-      const newEndDateMs = event2.duration + Date.parse(newStartDate);
-      const newEndDate = new Date(newEndDateMs);
-      event2.startDate = newStartDate;
+      const newEndDate = DateHelper.add(newStartDate, event2.duration, "ms");
+      // Second param means that the event keeps it's duration
       event2.setEndDate(newEndDate, true);
     }
   }
