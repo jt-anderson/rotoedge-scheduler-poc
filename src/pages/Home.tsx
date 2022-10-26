@@ -10,7 +10,6 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 // Custom component imports
 import UnassignedTable from "../components/UnassignedTable";
-import ArmScheduler from "../components/ArmScheduler";
 import ArmDetail from "../components/ArmDetail";
 // Custom library imports
 import {
@@ -23,6 +22,7 @@ import { machines_response } from "../data/machines";
 import { unloadedOrders } from "../data/sample-data";
 import { machine_display_response } from "../data/machine-display";
 import { enhanced_arm_loadqueue_62_response } from "../data/arm-enhanced-loadqueue";
+import RotoEdgeScheduler from "../components/Scheduler";
 
 const Home = () => {
   const [machines] = useState(machines_response.machines);
@@ -138,10 +138,7 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
         {/* Info about the arm and orders that are currently molding. Not necessary for integration */}
         <ArmDetail moldingArmOrders={moldingArmOrders} />
         {/* The scheduler component for the arm */}
-        <ArmScheduler
-          armId={arm.id}
-          scheduledArmOrders={allScheduledArmOrders}
-        />
+        <RotoEdgeScheduler armId={arm.id} orders={allScheduledArmOrders} />
       </AccordionDetails>
     </Accordion>
   );

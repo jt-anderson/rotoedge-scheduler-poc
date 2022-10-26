@@ -76,6 +76,7 @@ const getOrdersWithStartDates = (allOrders: any) => {
     // Apply start dates. If the order is the root item, set it's start to the current date
     sortedArray.forEach((sortedOrder: any, i: number) => {
       if (i === 0) {
+        // We assume the first element is the root element
         tempScheduledArmOrders.push({ ...sortedOrder, startDate: new Date() });
       } else {
         // We have to find the previous order because we need it's created startTime. Won't
@@ -152,10 +153,25 @@ const cleanupResources = (resourceStore: any) => {
   resourceStore.remove(toDelete);
 };
 
+const getResourcesFromOrders = (events: any[], armId: number) => {
+  // Get unique resources from events
+  let rows = events.reduce((accumulator: any, order: any) => {
+    if (!accumulator.includes(order.scheduled_resource_id)) {
+      accumulator.push(order.scheduled_resource_id);
+    }
+    return accumulator;
+  }, []);
+  // Push a default resource because we always want one more than the initial length
+  rows.push(`${armId}-r${rows.length + 1}`);
+  // Map to objects with the resource as the id. Needed for resource store
+  return rows.map((res: any) => ({ id: res }));
+};
+
 export {
   getEventAdjustedDuration,
   mapToOrderModel,
   normalizeOrder,
   getOrdersWithStartDates,
   cleanupResources,
+  getResourcesFromOrders,
 };

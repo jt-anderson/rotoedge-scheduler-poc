@@ -10,7 +10,6 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 // Custom component imports
 import UnassignedTable from "../components/UnassignedTable";
-import ArmScheduler from "../components/ArmScheduler";
 import CustomDragContainer from "../components/SchedulerDragContainer";
 import ArmDetail from "../components/ArmDetail";
 // Custom library imports
@@ -29,6 +28,7 @@ import {
   arm_62_unscheduled_orders,
   arm_63_unscheduled_orders,
 } from "../data/arm-unscheduled-orders";
+import RotoEdgeScheduler from "../components/Scheduler";
 
 const MachineScheduling = () => {
   // Using state hook because I'm assuming this data will be set in a useEffect later
@@ -87,16 +87,14 @@ const MachineAccordion: FC<MachineAccordionProps> = ({ machine }) => {
       </AccordionSummary>
       <AccordionDetails>
         <Typography variant="h6">Machine Arms</Typography>
-        {machineArms.map((arm: any, i: number) => {
-          return (
-            <ArmAccordion
-              key={`arm-accordion-${i}`}
-              arm={arm}
-              index={i}
-              moldingArmOrders={arm.orders}
-            />
-          );
-        })}
+        {machineArms.map((arm: any, i: number) => (
+          <ArmAccordion
+            key={`arm-accordion-${i}`}
+            arm={arm}
+            index={i}
+            moldingArmOrders={arm.orders}
+          />
+        ))}
         {/* This is the list of all items on the machine. We can ignore this for integration. */}
         <Typography variant="h6" mt={2}>
           Machine Orders
@@ -118,21 +116,14 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   index,
   moldingArmOrders,
 }) => {
-  // Required: Make a new ref for the external drag container (MUI table with assigned orders)
+  // Make a new ref for the external drag container (MUI table with assigned orders)
   const dragContainer = useRef(null);
+
+  // ================== SCHEDULED ORDERS SECTION =======================
 
   // This represents all of the orders that are scheduled but are not currently molding
   const [scheduledOrders] = useState(
     arm.id === 62 ? enhanced_arm_loadqueue_62_response.objects : []
-  );
-
-  // This represents the items that have been assigned to the arm but haven't been scheduled
-  const [unqueuedItems, setUnqueuedItems] = useState(
-    arm.id === 62
-      ? mapToOrderModel(arm_62_unscheduled_orders.unscheduled_orders)
-      : arm.id === 63
-      ? mapToOrderModel(arm_63_unscheduled_orders.unscheduled_orders)
-      : []
   );
 
   // The schema for orders that are molding vs those that are scheduled is different so I'm normalizing them here
@@ -148,12 +139,23 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
     getOrdersWithStartDates(allNormalizedOrders)
   );
 
-  // Create a new unassigned store based off the data in unqueuedItems. We create it here so we can
-  // espose its methods to the Scheduler component. This is the drawback of having to create our own
-  // implementation of drag-and-drop
+  // ================== UNSCHEDULED ORDERS SECTION =======================
+
+  // This represents the items that have been assigned to the arm but haven't been scheduled
+  const [unscheduledOrders, setUnscheduledOrders] = useState(
+    arm.id === 62
+      ? mapToOrderModel(arm_62_unscheduled_orders.unscheduled_orders)
+      : arm.id === 63
+      ? mapToOrderModel(arm_63_unscheduled_orders.unscheduled_orders)
+      : []
+  );
+
+  // Create a new unassigned store based off the data in unscheduledOrders. We create it here so we can
+  // expose its methods to the Scheduler component. This is the drawback of having to create our own
+  // implementation of drag-and-drop.
   const [unassignedStore] = useState(
     new UnassignedStore({
-      data: unqueuedItems,
+      data: unscheduledOrders,
     })
   );
 
@@ -165,9 +167,9 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
     (props: any) => {
       const { records } = props;
       const flatData: any[] = records.map((rec: any) => rec.originalData);
-      setUnqueuedItems([...unqueuedItems, ...flatData]);
+      setUnscheduledOrders([...unscheduledOrders, ...flatData]);
     },
-    [unqueuedItems]
+    [unscheduledOrders]
   );
 
   /**
@@ -179,12 +181,12 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
       const { records } = props;
       const recordsIds = records.map((rec: any) => +rec.data.id);
 
-      const filteredItems = unqueuedItems.filter(
+      const filteredItems = unscheduledOrders.filter(
         (item: any) => !recordsIds.includes(item.id)
       );
-      setUnqueuedItems(filteredItems);
+      setUnscheduledOrders(filteredItems);
     },
-    [unqueuedItems]
+    [unscheduledOrders]
   );
 
   /**
@@ -198,13 +200,13 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
       if (action === "clearchanges") {
         const toAdd = changes.removed.map((obj: any) => obj.data);
         const idsToRemove = changes.added.map((obj: any) => obj.data.id);
-        const newState = [...unqueuedItems, ...toAdd].filter(
+        const newState = [...unscheduledOrders, ...toAdd].filter(
           (item: any) => !idsToRemove.includes(item.id)
         );
-        setUnqueuedItems(newState);
+        setUnscheduledOrders(newState);
       }
     },
-    [unqueuedItems]
+    [unscheduledOrders]
   );
 
   useEffect(() => {
@@ -243,16 +245,17 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
         {/* Info about the arm and orders that are currently molding. Not necessary for integration */}
         <ArmDetail moldingArmOrders={moldingArmOrders} />
         {/* The scheduler component for the arm */}
-        <ArmScheduler
+        <RotoEdgeScheduler
           armId={arm.id}
           unassignedStore={unassignedStore}
           dragContainer={dragContainer}
-          scheduledArmOrders={allScheduledArmOrders}
+          orders={allScheduledArmOrders}
           readOnly={false}
         />
         {/* The draggable list of items that are scheduled to the arm but aren't scheduled on the scheduler yet */}
         <CustomDragContainer armId={arm.id} dragContainerRef={dragContainer}>
-          <UnassignedTable rows={unqueuedItems} />
+          {/* API Table component could go here in place of <UnassignedTable /> */}
+          <UnassignedTable rows={unscheduledOrders} />
         </CustomDragContainer>
       </AccordionDetails>
     </Accordion>

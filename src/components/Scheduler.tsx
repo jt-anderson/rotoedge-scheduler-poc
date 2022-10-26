@@ -7,7 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import { BryntumScheduler } from "@bryntum/scheduler-react";
-import { DateHelper, PresetManager, PresetStore } from "@bryntum/scheduler";
+import { DateHelper, PresetManager, ResourceStore } from "@bryntum/scheduler";
 import { schedulerConfig } from "../lib/SchedulerConfig";
 import OrderStore from "../lib/OrderStore.js";
 import Dialog from "@mui/material/Dialog";
@@ -16,7 +16,7 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Button from "@mui/material/Button";
 import { BryntumDateTimeField } from "@bryntum/scheduler-react";
-import { cleanupResources } from "../lib/Util";
+import { cleanupResources, getResourcesFromOrders } from "../lib/Util";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
@@ -26,45 +26,74 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import IconButton from "@mui/material/IconButton";
 import { customPresets } from "../lib/SchedulerTimeConfig";
 import HardBreakStore from "../lib/HardBreakStore";
+import CustomDrag from "../lib/CustomDragHelper";
 
 /**
  * @param {any[]} orders Array of orders that are placed on Scheduler
  * @param {boolean} [readOnly=true] Bool if scheduler is read only
  */
 interface BscProps {
-  orders?: any[];
-  schedulerRef: any;
-  events: any[];
+  readOnly?: boolean;
+  orders: any[];
   unassignedStore?: any;
-  armId?: any;
-  resources: any[];
-  readOnly: boolean;
+  armId: any;
+  dragContainer?: any;
 }
 
 const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
-  readOnly,
-  schedulerRef,
-  events,
+  readOnly = true,
+  orders,
   unassignedStore,
   armId,
-  resources,
+  dragContainer,
 }) => {
-  const [scheduledStore] = useState(new OrderStore()); // Schedule store
+  // Scheduler is read only if the param is true, or there was no dragContainer / unassignedStore passed
+  const isReadOnly = readOnly || !dragContainer || !unassignedStore;
+  // Create ref for scheduler
+  const schedulerRef: any = useRef<BryntumScheduler>(null);
+  // State hook for incremental IDs for hard break lines. There is most certainly a
+  // better way of doing this
   const [hbIdIncrement, setHbIdIncrement] = useState(1);
-  const [eventDetailOpen, setEventDetailOpen] = useState(false);
-  const [eventDetail, setEventDetail] = useState(null);
-  const [activePreset, setActivePreset] = useState("oneWeekPreset");
+  // Bool for when the dialog for adding a hard break is open
   const [addHardBreakOpen, setAddHardBreakOpen] = useState(false);
+  // Bool for when the details about an order is open
+  const [orderDetailOpen, setOrderDetailOpen] = useState(false);
+  // Reference to the order that is being viewed
+  const [orderDetail, setOrderDetail] = useState(null);
+  // The ID of the time preset. Defaults to oneWeek
+  const [activePreset, setActivePreset] = useState("oneWeekPreset");
+  // EventStore for the scheduler. Holds the orders
+  const [scheduledStore] = useState(new OrderStore({ data: orders }));
+  // ResourceStore for the scheduler. We grab the resources (rows) based off the passed orders
+  const [rowStore] = useState(
+    new ResourceStore({ data: getResourcesFromOrders(orders, armId) })
+  );
+  // Time range store for scheduler. Holds data about hard breaks
+  const [hardBreakStore] = useState(
+    new HardBreakStore({
+      data: [
+        {
+          id: 123,
+          startDate: DateHelper.add(new Date(), 12, "hour"),
+          name: "Hard Break",
+          cls: "hard-break-scheduler",
+        },
+      ],
+    })
+  );
 
-  const closeEventDetailDialog = () => {
-    setEventDetailOpen(false);
-    setEventDetail(null);
+  // Function thats called when the order details dialog is closed
+  const closeOrderDetailDialog = () => {
+    setOrderDetailOpen(false);
+    setOrderDetail(null);
   };
 
+  // Function thats called when the hard break dialog is closed
   const closeHardBreakDialog = () => {
     setAddHardBreakOpen(false);
   };
 
+  // Function thats called when a hard break line is added
   const addHardBreakLine = (value: any) => {
     const { startDate } = value;
     const newHardBreakObj = {
@@ -79,6 +108,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     schedulerRef.current.instance.timeRangeStore.add(newHardBreakObj);
   };
 
+  // Function thats called when a hard break line is removed
   const removeHardBreakLine = (config: any) => {
     // This is by far the most hacky solution
     let { targetElement } = config;
@@ -89,6 +119,8 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     schedulerRef.current.instance.timeRangeStore.remove(data);
   };
 
+  // Callback when the save button is clicked. Note: These details are useful but we'll need to do
+  // more work to realign the priority queue. See note below
   const saveChanges = () => {
     const schedulerInstance = schedulerRef.current.instance;
     const modifications: any = {
@@ -118,6 +150,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     console.log("modifications", modifications);
   };
 
+  // Callback when the discard changes button is clicked. Reverts all relevant stores.
   const cancelChanges = () => {
     scheduledStore.revertChanges(); // reset the scheduled orders
     unassignedStore.revertChanges(); // reset the unassigned orders
@@ -125,6 +158,8 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
     schedulerRef.current.instance.timeRangeStore.revertChanges(); // reset the hard breaks
   };
 
+  // Callback when a time preset is changed. It helps to pass the current date as the begin / end
+  // date to allow the scheduler to refresh and fit the view correctly.
   const handlePresetChange = (e: any) => {
     const presetId = e.target.value;
     schedulerRef.current.instance.zoomTo({
@@ -137,251 +172,238 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
   };
 
   useEffect(() => {
-    // Add custom time presets to PresetManager once when page loads
+    // Instantiate the drag class here. It's config ties the scheduler to the container
+    // for drag and drop orders. (ONLY for dragging items onto the scheduler. Dragging items back to the
+    // unqueued list has logic handled in the Scheduler component itself.)
+    if (!isReadOnly) {
+      new CustomDrag({
+        armId,
+        unassignedStore,
+        schedule: schedulerRef.current?.instance,
+        outerElement: dragContainer.current,
+        dropTargetSelector: `.scheduler-${armId} .b-timeline-subgrid`,
+      });
+    }
+    // Add custom time presets to PresetManager one time when page loads
     PresetManager.add(customPresets);
-  }, [customPresets]);
-
-  const hardBreakStore = new HardBreakStore({
-    data: [
-      {
-        id: 123,
-        startDate: "2022-10-25T11:00",
-        // endDate        : '2019-01-01T13:00',
-        name: "Hard Break",
-        cls: "hard-break-scheduler",
-      },
-    ],
   });
 
   return (
-    <Box flexDirection="column" className="flex-grow">
-      {/* Both containers needs CSS properties in flex-grow class */}
-      <div id="bryntumScheduler" className="flex-grow bryntumScheduler">
-        <BryntumScheduler
-          ref={schedulerRef}
-          readOnly={readOnly}
-          events={events}
-          resources={resources}
-          createEventOnDblClick={false}
-          zoomOnTimeAxisDoubleClick={false}
-          viewPreset={activePreset}
-          presets={customPresets}
-          eventEditFeature={false}
-          eventDragCreateFeature={{ disabled: true }}
-          scheduleMenuFeature={{ disabled: true }}
-          crudManager={{
-            validateResponse: true,
-            eventStore: scheduledStore,
-            timeRangeStore: hardBreakStore,
-            autoLoad: true,
-          }}
-          eventRenderer={(config: any) => {
-            const { renderData, eventRecord } = config;
-            renderData.style = `border-radius:${"5px"}`;
-            renderData.eventColor = eventRecord.item_currently_molding
-              ? "blue"
-              : "rgb(189 175 108)";
-            return eventRecord.name;
-          }}
-          timeRangesFeature={{
-            showCurrentTimeLine: {
-              name: "Now",
-            },
-            showHeaderElements: true,
-            enableResizing: true,
-            showTooltip: true,
-            callOnFunctions: true,
-            // tooltipTemplate({ timeRange }) {
-            //   return `${timeRange.name}`;
-            // },
-          }}
-          eventDragFeature={{
-            // Allow dragging events outside of the Scheduler
-            constrainDragToTimeline: false,
-            // With this method, you can let the scheduler now if the drop operation is valid or not
-            //   validatorFn({ draggedRecords: any, event: any }) {
-            // validatorFn(res: any) {
-            //   if (!res.valid) {
-            //     console.log("not vlaid!");
-            //   }
-            // },
-
-            // This CSS selector defines where a user may drop events outside the scheduler element
-            externalDropTargetSelector: "#unqueuedItemsContainer",
-          }}
-          eventMenuFeature={{
-            items: {
-              copyEvent: false,
-              cutEvent: false,
-              deleteEvent: false,
-              unassign: !readOnly && {
-                icon: null,
-                text: "Unassign",
-                weight: 300,
-                onItem: (config: any) => {
-                  scheduledStore.remove(config.eventRecord);
-                  unassignedStore.add(config.eventRecord);
-                  cleanupResources(schedulerRef.current.instance.resourceStore);
-                },
-              },
-              moveForward: !readOnly && {
-                text: "Move 1 Day Ahead",
-                cls: "b-separator", // Add a visual line above the item
-                weight: 400, // Add the item to the bottom
-                onItem: (config: any) => {
-                  config.eventRecord.shift(1, "day");
-                },
-              },
-              eventDetails: {
-                text: "See Order Details",
-                weight: 400, // Add the item to the bottom
-                onItem: (config: any) => {
-                  setEventDetailOpen(true);
-                  setEventDetail(config.eventRecord);
-                },
-              },
-            },
-            processItems: (config: any) => {
-              const { eventRecord, items } = config;
-              if (!eventRecord.draggable) {
-                items.moveForward = false;
-                items.unassign = false;
-              }
-            },
-          }}
-          timeAxisHeaderMenuFeature={{
-            // The TimeAxis Header menu is created, but starts disabled
-            // disabled: true,
-            items: {
-              eventsFilter: false,
-              zoomLevel: false,
-              dateRange: false,
-              currentTimeLine: false,
-              removeHardBreak: {
-                text: "Remove Hard Break",
-                weight: 400,
-                onItem: removeHardBreakLine,
-              },
-            },
-            processItems: (config: any) => {
-              const { targetElement } = config;
-              const timeRangeClasslist = targetElement?.classList;
-              const timeRangeParentClasslist =
-                targetElement?.parentElement?.classList;
-
-              console.log("config", config);
-              if (
-                !timeRangeClasslist.value.includes("timerange") &&
-                !timeRangeParentClasslist.value.includes("timerange")
-              ) {
-                config.items.removeHardBreak = false;
-              }
-            },
-          }}
-          listeners={{
-            eventDrop(res: any) {
-              console.log("drop event", res);
-              const { browserEvent, eventRecords, externalDropTarget } = res;
-              if (res.externalDropTarget) {
-                scheduledStore.remove(eventRecords);
-                unassignedStore.add(eventRecords);
-                cleanupResources(schedulerRef.current.instance.resourceStore);
-              }
-            },
-          }}
-          {...schedulerConfig}
-        />
-      </div>
-      <Box mt={1} display="flex" justifyContent="space-between">
-        <Box display={"flex"}>
-          <IconButton
-            size={"small"}
-            sx={{ display: "flex" }}
-            color="primary"
-            onClick={() => schedulerRef.current.instance.shiftPrevious()}
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <ViewPresetDropdown
-            selectedPreset={activePreset}
+    <div id="schedulerContainer" className={`scheduler-${armId}`}>
+      <Box flexDirection="column" className="flex-grow">
+        {/* Both containers needs CSS properties in flex-grow class */}
+        <div id="bryntumScheduler" className="flex-grow bryntumScheduler">
+          <BryntumScheduler
+            ref={schedulerRef}
+            readOnly={readOnly}
+            createEventOnDblClick={false}
+            zoomOnTimeAxisDoubleClick={false}
+            viewPreset={activePreset}
             presets={customPresets}
-            handleChange={handlePresetChange}
+            eventEditFeature={false}
+            eventDragCreateFeature={{ disabled: true }}
+            scheduleMenuFeature={{ disabled: true }}
+            crudManager={{
+              validateResponse: true,
+              eventStore: scheduledStore,
+              resourceStore: rowStore,
+              timeRangeStore: hardBreakStore,
+              autoLoad: true,
+            }}
+            eventRenderer={(config: any) => {
+              const { renderData, eventRecord } = config;
+              renderData.style = `border-radius:${"5px"}`;
+              renderData.eventColor = eventRecord.item_currently_molding
+                ? "blue"
+                : "rgb(189 175 108)";
+              return eventRecord.name;
+            }}
+            timeRangesFeature={{
+              showCurrentTimeLine: {
+                name: "Now",
+              },
+              showHeaderElements: true,
+              enableResizing: true,
+              showTooltip: true,
+              callOnFunctions: true,
+            }}
+            eventDragFeature={{
+              // Allow dragging orders outside of the Scheduler
+              constrainDragToTimeline: false,
+              // This CSS selector defines where a user may drop orders outside the scheduler element
+              externalDropTargetSelector: "#unqueuedItemsContainer",
+            }}
+            eventMenuFeature={{
+              items: {
+                copyEvent: false,
+                cutEvent: false,
+                deleteEvent: false,
+                unassign: !readOnly && {
+                  icon: null,
+                  text: "Unassign",
+                  weight: 300,
+                  onItem: (config: any) => {
+                    scheduledStore.remove(config.eventRecord);
+                    unassignedStore.add(config.eventRecord);
+                    cleanupResources(
+                      schedulerRef.current.instance.resourceStore
+                    );
+                  },
+                },
+                moveForward: !readOnly && {
+                  text: "Move 1 Day Ahead",
+                  cls: "b-separator", // Add a visual line above the item
+                  weight: 400, // Add the item to the bottom
+                  onItem: (config: any) => {
+                    config.eventRecord.shift(1, "day");
+                  },
+                },
+                orderDetails: {
+                  text: "See Order Details",
+                  weight: 400, // Add the item to the bottom
+                  onItem: (config: any) => {
+                    setOrderDetailOpen(true);
+                    setOrderDetail(config.eventRecord);
+                  },
+                },
+              },
+              processItems: (config: any) => {
+                const { eventRecord, items } = config;
+                if (!eventRecord.draggable) {
+                  items.moveForward = false;
+                  items.unassign = false;
+                }
+              },
+            }}
+            timeAxisHeaderMenuFeature={{
+              items: {
+                eventsFilter: false,
+                zoomLevel: false,
+                dateRange: false,
+                currentTimeLine: false,
+                removeHardBreak: {
+                  text: "Remove Hard Break",
+                  weight: 400,
+                  onItem: removeHardBreakLine,
+                },
+              },
+              processItems: (config: any) => {
+                const { targetElement } = config;
+                const timeRangeClasslist = targetElement?.classList;
+                const timeRangeParentClasslist =
+                  targetElement?.parentElement?.classList;
+                if (
+                  (!timeRangeClasslist.value.includes("timerange") &&
+                    !timeRangeParentClasslist.value.includes("timerange")) ||
+                  isReadOnly
+                ) {
+                  config.items.removeHardBreak = false;
+                }
+              },
+            }}
+            listeners={{
+              eventDrop(res: any) {
+                const { eventRecords } = res;
+                if (res.externalDropTarget) {
+                  scheduledStore.remove(eventRecords);
+                  unassignedStore.add(eventRecords);
+                  cleanupResources(schedulerRef.current.instance.resourceStore);
+                }
+              },
+            }}
+            {...schedulerConfig}
           />
-          <IconButton
-            size={"small"}
-            sx={{ display: "flex" }}
-            color="primary"
-            onClick={() => schedulerRef.current.instance.shiftNext()}
-          >
-            <ChevronRightIcon />
-          </IconButton>
-        </Box>
-        {/* If readOnly is false, include toolbar to edit rows */}
-        {!readOnly && (
+        </div>
+        <Box mt={1} display="flex" justifyContent="space-between">
           <Box display={"flex"}>
-            <Button
-              variant="outlined"
-              size={"small"}
-              sx={{ display: "flex", marginRight: 1 }}
-              color="info"
-              onClick={() => setAddHardBreakOpen(true)}
-            >
-              Add Hard Break
-            </Button>
-            <Button
-              variant="outlined"
-              size={"small"}
-              sx={{ display: "flex", marginRight: 1 }}
-              onClick={saveChanges}
-            >
-              Save Changes
-            </Button>
-            <Button
-              variant="outlined"
+            <IconButton
               size={"small"}
               sx={{ display: "flex" }}
-              color="error"
-              onClick={cancelChanges}
+              color="primary"
+              onClick={() => schedulerRef.current.instance.shiftPrevious()}
             >
-              Discard Changes
-            </Button>
+              <ChevronLeftIcon />
+            </IconButton>
+            <ViewPresetDropdown
+              selectedPreset={activePreset}
+              presets={customPresets}
+              handleChange={handlePresetChange}
+            />
+            <IconButton
+              size={"small"}
+              sx={{ display: "flex" }}
+              color="primary"
+              onClick={() => schedulerRef.current.instance.shiftNext()}
+            >
+              <ChevronRightIcon />
+            </IconButton>
           </Box>
-        )}
+          {/* If read only, don't include toolbar to edit rows */}
+          {!readOnly && (
+            <Box display={"flex"}>
+              <Button
+                variant="outlined"
+                size={"small"}
+                sx={{ display: "flex", marginRight: 1 }}
+                color="info"
+                onClick={() => setAddHardBreakOpen(true)}
+              >
+                Add Hard Break
+              </Button>
+              <Button
+                variant="outlined"
+                size={"small"}
+                sx={{ display: "flex", marginRight: 1 }}
+                onClick={saveChanges}
+              >
+                Save Changes
+              </Button>
+              <Button
+                variant="outlined"
+                size={"small"}
+                sx={{ display: "flex" }}
+                color="error"
+                onClick={cancelChanges}
+              >
+                Discard Changes
+              </Button>
+            </Box>
+          )}
+        </Box>
+        <OrderDetailDialog
+          closeOrderDetail={closeOrderDetailDialog}
+          event={orderDetail}
+          orderDetailOpen={orderDetailOpen}
+        />
+        <AddHardBreakDialog
+          onClose={closeHardBreakDialog}
+          open={addHardBreakOpen}
+          onSave={addHardBreakLine}
+        />
       </Box>
-      <EventDetailDialog
-        closeEventDetail={closeEventDetailDialog}
-        event={eventDetail}
-        eventDetailOpen={eventDetailOpen}
-      />
-      <AddHardBreakDialog
-        onClose={closeHardBreakDialog}
-        open={addHardBreakOpen}
-        onSave={addHardBreakLine}
-      />
-    </Box>
+    </div>
   );
 };
 
-interface EventDetailDialogProps {
+interface OrderDetailDialogProps {
   event: any;
-  closeEventDetail: any;
-  eventDetailOpen: boolean;
+  closeOrderDetail: any;
+  orderDetailOpen: boolean;
 }
 
-const EventDetailDialog: FC<EventDetailDialogProps> = ({
+const OrderDetailDialog: FC<OrderDetailDialogProps> = ({
   event,
-  closeEventDetail,
-  eventDetailOpen,
+  closeOrderDetail,
+  orderDetailOpen,
 }) => {
   if (!event) {
     return <Fragment></Fragment>;
   }
   const { data } = event;
-  console.log("event", event);
   const durationUnrounded = DateHelper.as("hour", event.duration);
   const durationRounded = Math.round(durationUnrounded * 100) / 100;
   return (
-    <Dialog onClose={closeEventDetail} open={eventDetailOpen} maxWidth={false}>
+    <Dialog onClose={closeOrderDetail} open={orderDetailOpen} maxWidth={false}>
       <Box mx={4} my={2}>
         <Typography variant="h6">{`WO: ${data.work_order_number} (${data.balance} Parts)`}</Typography>
         <Divider sx={{ margin: "10px 0" }} />
@@ -479,6 +501,7 @@ interface ViewPresetDropdownProps {
   presets: any[];
   selectedPreset: any;
 }
+
 const ViewPresetDropdown: FC<ViewPresetDropdownProps> = ({
   handleChange,
   presets,

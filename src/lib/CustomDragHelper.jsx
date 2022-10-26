@@ -7,7 +7,7 @@ export default class Drag extends DragHelper {
       // Don't drag the actual row element, clone it
       cloneTarget: true,
       // Only allow drops on the schedule area
-      // dropTargetSelector: ".b-timeline-subgrid",
+      dropTargetSelector: ".b-timeline-subgrid",
       // Only allow drag of row elements inside on the unplanned grid
       // This classname is specific to the CustomDragContainer component
       targetSelector: ".scheduler-unplanned-item",

@@ -1,13 +1,24 @@
 import React from "react";
+import ArmDetail from "./ArmDetail";
 
-const CustomDragContainer = (props: any) => {
+interface CustomDragContainerProps {
+  armId: number;
+  dragContainerRef: any;
+  children: any;
+}
+
+const CustomDragContainer: React.FC<CustomDragContainerProps> = ({
+  armId,
+  dragContainerRef,
+  children,
+}) => {
   return (
     <div
       id="unqueuedItemsContainer"
-      className={`unqueuedItemsContainer-${props.armId}`}
-      ref={props.dragContainerRef}
+      className={`unqueuedItemsContainer-${armId}`}
+      ref={dragContainerRef}
     >
-      {props.children}
+      {children}
     </div>
   );
 };
