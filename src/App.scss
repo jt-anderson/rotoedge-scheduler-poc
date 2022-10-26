@@ -4,7 +4,6 @@
 
 // import bryntum theme
 // @import "~@bryntum/scheduler/scheduler.stockholm.css";
-@import "~@bryntum/scheduler/scheduler.material.css";
 
 body,
 html {
@@ -12,10 +11,6 @@ html {
   display: flex;
   flex: 1;
   height: 100%;
-  // flex-direction: column;
-  // height: 100vh;
-  // font-family: Lato, "Open Sans", Helvetica, Arial, sans-serif;
-  // font-size: 14px;
 }
 #container {
   display: flex;
@@ -30,7 +25,17 @@ html {
   font-size: 14px;
 }
 
+.css-o4b71y-MuiAccordionSummary-content.Mui-expanded {
+  margin: 5px 0 !important;
+}
+
+.css-sh22l5-MuiButtonBase-root-MuiAccordionSummary-root.Mui-expanded {
+  min-height: 48px !important;
+}
+
 // =============== This CSS below should be added ==================
+@import "~@bryntum/scheduler/scheduler.material.css";
+
 #innerAppContainer {
   flex: 1 1 100%;
   display: flex;
@@ -39,16 +44,13 @@ html {
 }
 
 #schedulerContainer {
-  //   flex: 1;
   display: flex;
-  // border: solid 1px #e9eaeb;
   margin: 10px 0;
 }
 
 .bryntumScheduler {
   border: solid 1px #717171;
   border-radius: 2.5px;
-  // overflow: hidden;
 }
 
 #unqueuedItemsContainer {
@@ -90,14 +92,6 @@ html {
   font-family: Roboto, sans-serif;
 }
 
-.css-o4b71y-MuiAccordionSummary-content.Mui-expanded {
-  margin: 5px 0 !important;
-}
-
-.css-sh22l5-MuiButtonBase-root-MuiAccordionSummary-root.Mui-expanded {
-  min-height: 48px !important;
-}
-
 .loadedOrderInArm {
   display: flex;
   flex: 1;
@@ -109,6 +103,7 @@ html {
   margin: 2.5px 2.5px 0 0;
 }
 
+// Hard break flag styling
 .hard-break-scheduler {
   background-color: #d52929 !important;
   border-color: #d52929 !important;
@@ -148,9 +143,4 @@ html {
   padding-top: 5px !important;
   padding-left: 15px !important;
   padding-bottom: 5px !important;
-}
-
-.view-preset-shift-button {
-  background-color: red;
-  border: solid 1px red;
 }
