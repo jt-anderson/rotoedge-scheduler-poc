@@ -97,6 +97,47 @@ const getOrdersWithStartDates = (allOrders: any) => {
   return tempScheduledArmOrders;
 };
 
+// Helper function to remove resources that have no events in them- except for the last resource
+// in the scheduler. We leave the last row as empty to allow new rows to be added when an order is
+// dropped on it.
+const cleanupResources = (resourceStore: any) => {
+  const resourceIdMap = resourceStore.idMap;
+  const toDelete: any = [];
+  Object.keys(resourceIdMap).forEach((resourceId) => {
+    const resourceDetail = resourceIdMap[resourceId];
+    const resourceEvents = resourceDetail.record.events;
+    const resourcesCount = Object.keys(resourceIdMap).length;
+    if (
+      resourceEvents.length === 0 && // There are no events in this resource
+      resourcesCount - 1 !== resourceDetail.index // Its not the last row
+    ) {
+      // resourceStore.remove(resourceId);
+      toDelete.push(resourceId);
+    }
+  });
+  resourceStore.remove(toDelete);
+};
+
+// Helper function to grab the resources off of list of all scheduled orders. Used to build the
+// ResourceStore on the scheduler.
+const getResourcesFromOrders = (events: any[], armId: number) => {
+  // Get unique resources from events
+  let rows = events.reduce((accumulator: any, order: any) => {
+    if (!accumulator.includes(order.scheduled_resource_id)) {
+      accumulator.push(order.scheduled_resource_id);
+    }
+    return accumulator;
+  }, []);
+  // Push a default resource because we always want one more than the initial length
+  rows.push(`${armId}-r${rows.length + 1}`);
+  // Map to objects with the resource as the id. Needed for resource store
+  return rows.map((res: any) => ({ id: res }));
+};
+
+// NOTE: This is deprecated as of now. The goal was that if we used the Schedulers working days config,
+// we'd have to extend the visual duration of orders to extend past 'out of work' hours. I'm keeping
+// it here temporarily as the logic wasn't incorrect, but we're just not using it anymore for simplicity.
+
 // Helper function that adjusts the duration of the order based off the cofigurations for
 // WORKING_START_HOUR and WORKING_END_HOUR
 // To-Do: Add handling for weekends using the WORKING_START_DAY and WORKING_END_DAY values
@@ -131,40 +172,6 @@ const getEventAdjustedDuration = (event: any) => {
   const totalDaysFilledInMs = numberOfDaysToFill * nonWorkingHoursMs;
 
   return event.duration + totalDaysFilledInMs;
-};
-
-// Helper function to remove resources that have no events in them- except for the last resource
-// in the scheduler. We leave the last row as empty to allow new rows to be dragged.
-const cleanupResources = (resourceStore: any) => {
-  const resourceIdMap = resourceStore.idMap;
-  const toDelete: any = [];
-  Object.keys(resourceIdMap).forEach((resourceId) => {
-    const resourceDetail = resourceIdMap[resourceId];
-    const resourceEvents = resourceDetail.record.events;
-    const resourcesCount = Object.keys(resourceIdMap).length;
-    if (
-      resourceEvents.length === 0 && // There are no events in this resource
-      resourcesCount - 1 !== resourceDetail.index // Its not the last row
-    ) {
-      // resourceStore.remove(resourceId);
-      toDelete.push(resourceId);
-    }
-  });
-  resourceStore.remove(toDelete);
-};
-
-const getResourcesFromOrders = (events: any[], armId: number) => {
-  // Get unique resources from events
-  let rows = events.reduce((accumulator: any, order: any) => {
-    if (!accumulator.includes(order.scheduled_resource_id)) {
-      accumulator.push(order.scheduled_resource_id);
-    }
-    return accumulator;
-  }, []);
-  // Push a default resource because we always want one more than the initial length
-  rows.push(`${armId}-r${rows.length + 1}`);
-  // Map to objects with the resource as the id. Needed for resource store
-  return rows.map((res: any) => ({ id: res }));
 };
 
 export {

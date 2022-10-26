@@ -60,7 +60,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   // Reference to the order that is being viewed
   const [orderDetail, setOrderDetail] = useState(null);
-  // The ID of the time preset. Defaults to oneWeek
+  // The ID of the time preset. Defaults to oneWeek. See lib/SchedulerTimeConfig.tsx
   const [activePreset, setActivePreset] = useState("oneWeekPreset");
   // EventStore for the scheduler. Holds the orders
   const [scheduledStore] = useState(new OrderStore({ data: orders }));
