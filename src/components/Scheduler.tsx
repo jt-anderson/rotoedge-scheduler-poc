@@ -28,10 +28,6 @@ import { customPresets } from "../lib/SchedulerTimeConfig";
 import HardBreakStore from "../lib/HardBreakStore";
 import CustomDrag from "../lib/CustomDragHelper";
 
-/**
- * @param {any[]} orders Array of orders that are placed on Scheduler
- * @param {boolean} [readOnly=true] Bool if scheduler is read only
- */
 interface BscProps {
   readOnly?: boolean;
   orders: any[];
@@ -40,6 +36,15 @@ interface BscProps {
   dragContainer?: any;
 }
 
+/**
+ *
+ * @param {boolean} [readOnly=true] Bool if scheduler is read only
+ * @param {any[]} orders Array of orders that are placed on Scheduler
+ * @param {OrderStore} [unassignedStore] Unassigned stoe needed by scheduler to add or remove items
+ * @param {number} armId ID of arm
+ * @param {HTMLElement} [dragContainer] Ref to the external drag container
+ * @returns
+ */
 const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
   readOnly = true,
   orders,
