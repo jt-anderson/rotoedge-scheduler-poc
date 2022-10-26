@@ -116,7 +116,7 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   index,
   moldingArmOrders,
 }) => {
-  // Make a new ref for the external drag container (MUI table with assigned orders)
+  // Make a new ref for the external drag container (MUI table with unassigned orders)
   const dragContainer = useRef(null);
 
   // ================== SCHEDULED ORDERS SECTION =======================
