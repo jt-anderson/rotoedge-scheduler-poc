@@ -1,9 +1,11 @@
 import { DateHelper, DragHelper, DomHelper } from "@bryntum/scheduler";
+import Order from "./Order";
 import {
   ROW_HEIGHT,
   ROW_MARGIN,
   // ONLY_WORKING_HOURS
 } from "./SchedulerConfig";
+import { mapToCounterWeightModel } from "./Util";
 
 export default class Drag extends DragHelper {
   static get defaultConfig() {
@@ -14,9 +16,11 @@ export default class Drag extends DragHelper {
       dropTargetSelector: ".b-timeline-subgrid",
       // Only allow drag of row elements inside on the unplanned grid
       // This classname is specific to the CustomDragContainer component
-      targetSelector: ".scheduler-unplanned-item",
+      targetSelector: ".scheduler-counter-weight",
     };
   }
+
+  idIncrement = 704;
 
   construct(config) {
     const me = this;
@@ -45,16 +49,19 @@ export default class Drag extends DragHelper {
       mouseY = context.pageY,
       // grab mutable element that will represent the object while it's being dragged
       proxy = context.element,
-      // important - Each object that is draggable needs a data attribute on it's container with the object's id.
-      taskId = context.grabbed.getAttribute("data-id"),
-      // https://www.bryntum.com/docs/scheduler/api/Scheduler/model/EventModel
-      task = me.unassignedStore.findRecord("id", +taskId);
+      newCounterWeight = mapToCounterWeightModel({
+        id: this.idIncrement,
+        // Doing some funky calculation to get the duration from the width of the counter weight draggable box
+        duration: Math.ceil(
+          proxy.clientWidth /
+            schedule.timeAxisViewModel.getSingleUnitInPixels("millisecond")
+        ),
+        duration_unit: "millisecond",
+      }),
+      task = new Order(newCounterWeight);
 
-    // If we can't identify the task, don't allow the item to be dragged (this might occur for a couple
-    // of reasons). the dragged item could not be identified in the store so make sure:
-    // 1. the draggable item has a container with a data attribute ('data-id') of the item's ID
-    // 2. the CustomDrag class has an object called 'unassignedStore' which is correctly populated with
-    // the data store of items of assigned but unscheduled orders to that arm.
+    this.idIncrement += 1;
+
     if (task === undefined) {
       // task not found
       return;
@@ -141,7 +148,7 @@ export default class Drag extends DragHelper {
       // targetEventRecord = me.schedule.resolveEventRecord(context.target);
 
       if (date) {
-        me.unassignedStore.remove(task);
+        // me.unassignedStore.remove(task);
         // me.grid.store.remove(task);
 
         task.setStartDate(date, true);
@@ -151,6 +158,7 @@ export default class Drag extends DragHelper {
     }
 
     me.schedule.element.classList.remove("b-dragging-event");
+    context.task = undefined;
   }
 
   getParents(elem) {

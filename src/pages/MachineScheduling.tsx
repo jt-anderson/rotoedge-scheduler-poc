@@ -18,17 +18,21 @@ import {
   mapToOrderModel,
   normalizeOrder,
   getOrdersWithStartDates,
+  mapToCounterWeightModel,
+  mapToHardBreakModel,
 } from "../lib/Util";
 // Mock data imports
 import { machines_response } from "../data/machines";
 import { unloadedOrders } from "../data/sample-data";
 import { machine_display_response } from "../data/machine-display";
 import { enhanced_arm_loadqueue_62_response } from "../data/arm-enhanced-loadqueue";
+import { arm_62_counter_weights } from "../data/counter-weight";
 import {
   arm_62_unscheduled_orders,
   arm_63_unscheduled_orders,
 } from "../data/arm-unscheduled-orders";
 import RotoEdgeScheduler from "../components/Scheduler";
+import { DateHelper } from "@bryntum/scheduler";
 
 const MachineScheduling = () => {
   // Using state hook because I'm assuming this data will be set in a useEffect later
@@ -126,6 +130,12 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
     arm.id === 62 ? enhanced_arm_loadqueue_62_response.objects : []
   );
 
+  const [counterWeights] = useState(
+    arm.id === 62
+      ? arm_62_counter_weights.map((cw) => mapToCounterWeightModel(cw))
+      : []
+  );
+
   // The schema for orders that are molding vs those that are scheduled is different so I'm normalizing them here
   // and mapping them to the model that is required by the Scheduler componennt
   const allNormalizedOrders = mapToOrderModel([
@@ -136,7 +146,19 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
   // The final list of items that are scheduled on this arm. We grab their start dates based off
   // the priority queue of "load-after" fields.
   const [allScheduledArmOrders] = useState(
-    getOrdersWithStartDates(allNormalizedOrders)
+    getOrdersWithStartDates([...allNormalizedOrders, ...counterWeights])
+  );
+
+  // ================== HARD BREAKS SECTION =======================
+
+  const [hardBreaks] = useState(
+    [
+      {
+        id: 123,
+        start: DateHelper.add(new Date(), 1, "day"),
+        notes: "something!",
+      },
+    ].map((hardBreak: any) => mapToHardBreakModel(hardBreak))
   );
 
   // ================== UNSCHEDULED ORDERS SECTION =======================
@@ -250,6 +272,7 @@ const ArmAccordion: FC<ArmAccordionProps> = ({
           unassignedStore={unassignedStore}
           dragContainer={dragContainer}
           orders={allScheduledArmOrders}
+          hardBreaks={hardBreaks}
           readOnly={false}
         />
         {/* The draggable list of items that are scheduled to the arm but aren't scheduled on the scheduler yet */}

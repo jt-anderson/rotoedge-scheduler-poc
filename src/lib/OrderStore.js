@@ -9,11 +9,15 @@ export default class OrderStore extends EventStore {
     };
   }
 
+  // We set a static date here so that we can reference it as our current date. If the page was left open for 15 min,
+  // we can't use new Date() inline because it wont align with the data model.
+  currentDate = new Date();
+
   // Override add to reschedule any overlapping events caused by the add
   add(records, silent = false) {
     const me = this;
 
-    // Flag to avoid rescheduling during rescheduling
+    // Flag to avoid rescheduling during in-progress rescheduling
     me.isRescheduling = true;
     me.beginBatch();
 
@@ -29,11 +33,36 @@ export default class OrderStore extends EventStore {
 
   // Auto called when triggering the update event.
   // Reschedule if the update caused the event to overlap any others.
-  onUpdate({ record }) {
-    console.log("record", record);
+  onUpdate({ record, changes }) {
+    // Only update if we aren't currently rescheduling and if we have vlaid data
     if (!this.isRescheduling && record && record.resource !== undefined) {
+      this.beginBatch();
+      // If we find that an event has changed resources, we want to add a flag so that the rescheduling
+      // process will reschedule both resources (to eliminate empty spaces in each row)
+      const resMods = changes.resourceId;
+      if (resMods && resMods.oldValue !== resMods.value) {
+        record.previousResource = resMods.oldValue;
+      } else {
+        record.previousResource = null;
+      }
       this.rescheduleOverlappingTasks(record);
+      this.endBatch();
     }
+  }
+
+  onRemove(obj) {
+    const resourceIds = obj.records.reduce((accum, removedEvent) => {
+      if (!accum.includes(removedEvent.resourceId)) {
+        accum.push(removedEvent.resourceId);
+      }
+      return accum;
+    }, []);
+    resourceIds.forEach((resId) => {
+      const resourceRec = this.resourceStore.idMap[resId];
+      if (resourceRec) {
+        this.shiftEventsLeft(resourceRec.record.events);
+      }
+    });
   }
 
   rescheduleOverlappingTasks(eventRecord) {
@@ -67,12 +96,22 @@ export default class OrderStore extends EventStore {
       cleanupResources(me.resourceStore);
 
       // -------------------- AUTO SCHEDULE OVERLAPPING ORDERS -------------------
-      const futureEvents = [],
+      let futureEvents = [],
         earlierEvents = [];
+
+      // If we should also clean up the previous resource that this order moved from (move all of the orders left)
+      if (
+        eventRecord.previousResource &&
+        me.resourceStore.idMap[eventRecord.previousResource]
+      ) {
+        const { record: previousResourceRow } =
+          me.resourceStore.idMap[eventRecord.previousResource];
+
+        this.shiftEventsLeft(previousResourceRow.events);
+      }
 
       // Split events into future and earlier events
       eventRecord.resource.events.forEach((event) => {
-        // if (event !== eventRecord) {
         if (event.data.id !== eventRecord.data.id) {
           if (event.startDate >= eventRecord.startDate) {
             futureEvents.push(event);
@@ -82,43 +121,73 @@ export default class OrderStore extends EventStore {
         }
       });
 
-      const allEvents = [...earlierEvents, eventRecord, ...futureEvents];
-      if (allEvents.length) {
-        allEvents.sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
-
-        allEvents.forEach((ev, i, all) => {
-          const prev = all[i - 1];
-          // Normal shift
-          this.shiftEvents(prev, ev);
-        });
+      // To-Do: If this event was dropped before the current date marker, we need to shift items right
+      if (eventRecord.startDate < this.currentDate) {
+        // const rootElement = futureEvents.find(
+        //   (ev) => ev.startDate < this.currentDate
+        // );
+        // if (rootElement) {
+        //   // eventRecord.startDate = this.currentDate;
+        //   const newEndDate = DateHelper.add(
+        //     rootElement.endDate,
+        //     eventRecord.duration,
+        //     "ms"
+        //   );
+        //   // Second param means that the event keeps it's duration
+        //   eventRecord.setEndDate(newEndDate, true);
+        //   // futureEvents = futureEvents.filter((ev) => ev.id !== rootElement.id);
+        //   // earlierEvents.push(rootElement);
+        // }
       }
+
+      // Get all orders into one array and shift them left.
+      const allEvents = [...earlierEvents, eventRecord, ...futureEvents];
+
+      this.shiftEventsLeft(allEvents);
 
       this.isRescheduling = false;
     }
   }
 
-  doEventsOverlap(event1, event2) {
-    if (!event1 || !event2) {
-      return false;
-    }
-    const e1start = event1.startDate;
-    const e1end = event1.endDate;
-    const e2start = event2.startDate;
-    const e2end = event2.endDate;
-    return (
-      (e1start > e2start && e1start <= e2end) ||
-      (e2start > e1start && e2start <= e1end)
-    );
+  revertChanges() {
+    const resourceIdMap = this.resourceStore.idMap;
+    Object.keys(resourceIdMap).forEach((resourceId) => {
+      const resourceDetail = resourceIdMap[resourceId];
+      const resourceEvents = resourceDetail.record.events;
+
+      // To-Do: There is a bug where multiple items are unassigned and when changes are reverted, strange behavior occurs.
+      // The order (like item 2 removed, then item 3 removed) of how items are removed is important. We might have to manually
+      // handle the revert changes process by using the modified items to reconstruct the priority queue and reinsert.
+      this.shiftEventsLeft(resourceEvents);
+    });
+    super.revertChanges();
   }
 
-  areDatesTheSame(date1, date2) {
-    const date1InMs = Date.parse(date1);
-    const date2InMs = Date.parse(date2);
-    return date1InMs === date2InMs;
-  }
+  // Helper function that shifts items to the left.
+  shiftEventsLeft = (events) => {
+    if (events.length) {
+      events.sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
+
+      events.forEach((ev, i, all) => {
+        const prev = all[i - 1];
+        // if this is the first element and the startDate is before the current date.
+        if (!prev && ev.startDate > this.currentDate) {
+          const newEndDate = DateHelper.add(
+            this.currentDate,
+            ev.duration,
+            "ms"
+          );
+          ev.setEndDate(newEndDate, true);
+        } else {
+          // Normal shift
+          this.shiftEvents(prev, ev);
+        }
+      });
+    }
+  };
 
   shiftEvents(event1, event2) {
-    if (event1 && this.doEventsOverlap(event1, event2)) {
+    if (event1) {
       const newStartDate = event1.endDate;
       const newEndDate = DateHelper.add(newStartDate, event2.duration, "ms");
       // Second param means that the event keeps it's duration

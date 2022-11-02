@@ -107,6 +107,25 @@ const enhanced_arm_loadqueue_62_response = {
       quantity: 1,
       scheduled_resource_id: "62-r2",
     },
+
+    {
+      id: 908,
+      color: "in_loadqueue",
+      load_after: null,
+      load_after_id: null,
+      order: "12345",
+      number: 11,
+      item: "01-10353-002",
+      description: "TEST CASE",
+      balance: 40,
+      ship_date: "Sep 10, 2021",
+      takt: 14,
+      volume: "11",
+      under_privilege_loadable: false,
+      quantity: 1,
+      scheduled_resource_id: "62-r3",
+    },
+
     // {
     //   id: 84,
     //   color: "in_loadqueue",

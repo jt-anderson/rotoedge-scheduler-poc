@@ -25,9 +25,9 @@ export interface HardBreakModel {
 }
 
 export interface CounterWeightModel {
-  // not implemented yet
-  // These will essentially need to be an order model though. Only difference is
-  // we'll explciitly store the duration and we'll need to handle the load-after id
-  // ID that counter weights are unique and can be referenced by existing orders in the
-  // priority queue.
+  id: number; // preface with "c-xxxxx"
+  duration: number;
+  duration_unit: string;
+  load_after: string;
+  load_after_id: number;
 }

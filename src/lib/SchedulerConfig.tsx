@@ -1,5 +1,5 @@
 import { SchedulerConfig } from "@bryntum/scheduler";
-import { DateHelper } from "@bryntum/scheduler";
+// import { DateHelper } from "@bryntum/scheduler";
 
 /****** Global Variables *******/
 
@@ -9,7 +9,7 @@ const ROW_MARGIN: number = 5;
 
 // configured start date and end date
 const START_DATE = new Date();
-const END_DATE = DateHelper.add(START_DATE, 5, "days");
+// const END_DATE = DateHelper.add(START_DATE, 5, "days");
 
 // if we should only include working hours (configured with vars below). Note:
 // this should always be true- but can be useful to turn off for debugging

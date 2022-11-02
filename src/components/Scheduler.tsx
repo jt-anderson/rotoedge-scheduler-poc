@@ -27,10 +27,12 @@ import IconButton from "@mui/material/IconButton";
 import { customPresets } from "../lib/SchedulerTimeConfig";
 import HardBreakStore from "../lib/HardBreakStore";
 import CustomDrag from "../lib/CustomDragHelper";
+import CounterWeightDrag from "../lib/CounterWeightDragHelper";
 
 interface BscProps {
   readOnly?: boolean;
   orders: any[];
+  hardBreaks?: any[];
   unassignedStore?: any;
   armId: any;
   dragContainer?: any;
@@ -48,6 +50,7 @@ interface BscProps {
 const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
   readOnly = true,
   orders,
+  hardBreaks = [],
   unassignedStore,
   armId,
   dragContainer,
@@ -76,14 +79,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
   // Time range store for scheduler. Holds data about hard breaks
   const [hardBreakStore] = useState(
     new HardBreakStore({
-      data: [
-        {
-          id: 123,
-          startDate: DateHelper.add(new Date(), 12, "hour"),
-          name: "Hard Break",
-          cls: "hard-break-scheduler",
-        },
-      ],
+      data: hardBreaks,
     })
   );
 
@@ -157,13 +153,13 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
 
   // Callback when the discard changes button is clicked. Reverts all relevant stores.
   const cancelChanges = () => {
-    scheduledStore.revertChanges(); // reset the scheduled orders
-    unassignedStore.revertChanges(); // reset the unassigned orders
     scheduledStore.resourceStore.revertChanges(); // reset the rows
+    unassignedStore.revertChanges(); // reset the unassigned orders
     schedulerRef.current.instance.timeRangeStore.revertChanges(); // reset the hard breaks
+    scheduledStore.revertChanges(); // reset the scheduled orders
   };
 
-  // Callback when a time preset is changed. It helps to pass the current date as the begin / end
+  // Callback when a time preset is changed. It helps to pass the CURRENT date as the begin / end
   // date to allow the scheduler to refresh and fit the view correctly.
   const handlePresetChange = (e: any) => {
     const presetId = e.target.value;
@@ -188,10 +184,16 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
         outerElement: dragContainer.current,
         dropTargetSelector: `.scheduler-${armId} .b-timeline-subgrid`,
       });
+
+      new CounterWeightDrag({
+        armId,
+        schedule: schedulerRef.current?.instance,
+        dropTargetSelector: `.scheduler-${armId} .b-timeline-subgrid`,
+      });
     }
     // Add custom time presets to PresetManager one time when page loads
     PresetManager.add(customPresets);
-  });
+  }, [armId, dragContainer, isReadOnly, unassignedStore]);
 
   return (
     <div id="schedulerContainer" className={`scheduler-${armId}`}>
@@ -215,18 +217,13 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               timeRangeStore: hardBreakStore,
               autoLoad: true,
             }}
-            eventRenderer={(config: any) => {
-              const { renderData, eventRecord } = config;
-              renderData.style = `border-radius:${"5px"}`;
-              renderData.eventColor = eventRecord.item_currently_molding
-                ? "blue"
-                : "rgb(189 175 108)";
-              return eventRecord.name;
-            }}
+            eventStyle={undefined}
             timeRangesFeature={{
               showCurrentTimeLine: {
                 name: "Now",
               },
+              // How often the currentTime line updates. Default is 10000 ms or 10 sec
+              currentTimeLineUpdateInterval: 86400000, // Update in one day
               showHeaderElements: true,
               enableResizing: true,
               showTooltip: true,
@@ -242,6 +239,7 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               items: {
                 copyEvent: false,
                 cutEvent: false,
+                unassignEvent: false,
                 deleteEvent: false,
                 unassign: !readOnly && {
                   icon: null,
@@ -249,18 +247,12 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
                   weight: 300,
                   onItem: (config: any) => {
                     scheduledStore.remove(config.eventRecord);
-                    unassignedStore.add(config.eventRecord);
+                    if (config.eventRecord.type !== "counter_weight") {
+                      unassignedStore.add(config.eventRecord);
+                    }
                     cleanupResources(
                       schedulerRef.current.instance.resourceStore
                     );
-                  },
-                },
-                moveForward: !readOnly && {
-                  text: "Move 1 Day Ahead",
-                  cls: "b-separator", // Add a visual line above the item
-                  weight: 400, // Add the item to the bottom
-                  onItem: (config: any) => {
-                    config.eventRecord.shift(1, "day");
                   },
                 },
                 orderDetails: {
@@ -275,8 +267,10 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
               processItems: (config: any) => {
                 const { eventRecord, items } = config;
                 if (!eventRecord.draggable) {
-                  items.moveForward = false;
                   items.unassign = false;
+                }
+                if (config.eventRecord.type === "counter_weight") {
+                  items.orderDetails = false;
                 }
               },
             }}
@@ -309,10 +303,17 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
             listeners={{
               eventDrop(res: any) {
                 const { eventRecords } = res;
+                //If this event was dropped on the custom drag container wrapper
                 if (res.externalDropTarget) {
+                  // For multi-select, this list of events COULD include counter weights. We still want to remove them from the
+                  // schedule store and cleanup the resources- but we don't want to add them to the unassignesd store.
+                  const eventsToAddToUnassignedStore = eventRecords.filter(
+                    (ev: any) => ev.data.type !== "counter_weight"
+                  );
+
                   scheduledStore.remove(eventRecords);
-                  unassignedStore.add(eventRecords);
                   cleanupResources(schedulerRef.current.instance.resourceStore);
+                  unassignedStore.add(eventsToAddToUnassignedStore);
                 }
               },
             }}
@@ -346,6 +347,12 @@ const BryntumSchedulerComponent: FunctionComponent<BscProps> = ({
           {/* If read only, don't include toolbar to edit rows */}
           {!readOnly && (
             <Box display={"flex"}>
+              <Box
+                className={"counter-weight-button scheduler-counter-weight"}
+                sx={{ marginRight: 1 }}
+              >
+                <span style={{ display: "flex" }}>COUNTER WEIGHT</span>
+              </Box>
               <Button
                 variant="outlined"
                 size={"small"}

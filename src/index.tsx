@@ -7,7 +7,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import NavBar from "./components/NavBar";
 import Home from "./pages/Home";
 import MachineScheduling from "./pages/MachineScheduling";
-import "./App.scss";
+import "./App.css";
 
 const navList = [
   {

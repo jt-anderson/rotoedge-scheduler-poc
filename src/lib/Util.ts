@@ -1,11 +1,12 @@
 import { DateHelper } from "@bryntum/scheduler";
+import { start } from "repl";
 import {
-  ONLY_WORKING_HOURS,
-  WORKING_START_DAY,
-  WORKING_END_DAY,
+  // ONLY_WORKING_HOURS,
+  // WORKING_START_DAY,
+  // WORKING_END_DAY,
+  // START_DATE,
   WORKING_START_HOUR,
   WORKING_END_HOUR,
-  START_DATE,
 } from "./SchedulerConfig";
 
 // The orders that are CURRENTLY MOLDING have a different structure returned than the
@@ -30,7 +31,40 @@ const mapToOrderModel = (orders: any) => {
     draggable: order.item_currently_molding ? false : true,
     previousLoadOrder: order.load_after ? order.load_after.split(";")[0] : null,
     resizable: false,
+    cls: `scheduler-bar ${
+      order.item_currently_molding ? "scheduler-bar-currently-molding" : ""
+    }`,
   }));
+};
+
+// Helper function the maps counter_weights to the model needed by the scheduler
+const mapToCounterWeightModel = (counterWeight: any) => {
+  return {
+    ...counterWeight,
+    duration: DateHelper.asMilliseconds(
+      counterWeight.duration,
+      counterWeight.duration_unit
+    ),
+    resourceId: counterWeight.scheduled_resource_id,
+    name: "Counter Weight",
+    previousLoadOrder: counterWeight.load_after
+      ? counterWeight.load_after.split(";")[0]
+      : null,
+    draggable: true,
+    resizable: true,
+    type: "counter_weight",
+    cls: "scheduler-bar scheduler-bar-counter-weight",
+  };
+};
+
+// Helper function to map a hardbreak to the model needed by the scheduler
+const mapToHardBreakModel = (hardBreak: any) => {
+  return {
+    ...hardBreak,
+    startDate: hardBreak.start,
+    name: "Hard Break",
+    cls: "hard-break-scheduler",
+  };
 };
 
 // Helper function that will return a flat array of orders with their start dates. We use the
@@ -53,7 +87,7 @@ const getOrdersWithStartDates = (allOrders: any) => {
   );
 
   // Our return array
-  const tempScheduledArmOrders: any[] = [];
+  const tempOrdersArr: any[] = [];
 
   // Iterate over each respective resource group
   Object.keys(ordersByResourceGroups).forEach((key: string) => {
@@ -73,15 +107,32 @@ const getOrdersWithStartDates = (allOrders: any) => {
       []
     );
 
+    // Sanity check:
+    const allItemsWithNullLoadAfter = sortedArray.filter(
+      (item: any) => item.previousLoadOrder === null
+    );
+    if (allItemsWithNullLoadAfter.length > 1) {
+      // There are multiple items with load-after = null. We still plot these items on the scheduler but they will overlap.
+      console.error(
+        `Util.ts - There are multiple items in row: ${key} that have a null load_after property. Each row should only have one item with load_after = null`
+      );
+    } else if (allItemsWithNullLoadAfter.length === 0) {
+      // There are no elements that can act as the root. This case is bad because it won't plot the items on the scheduler.
+      console.error(
+        `Util.ts - In row: ${key}, there are items in the list but none of them have property load_after = null. Each row should have one item with load_after = null`
+      );
+    }
+
     // Apply start dates. If the order is the root item, set it's start to the current date
     sortedArray.forEach((sortedOrder: any, i: number) => {
-      if (i === 0) {
-        // We assume the first element is the root element
-        tempScheduledArmOrders.push({ ...sortedOrder, startDate: new Date() });
+      // if (i === 0) {
+      if (sortedOrder.previousLoadOrder === null) {
+        // If the element doesn't have an item to load after, we assume it's the root element
+        tempOrdersArr.push({ ...sortedOrder, startDate: new Date() });
       } else {
         // We have to find the previous order because we need it's created startTime. Won't
         // be accessible through sortedArray[i-1]
-        const previousOrder = tempScheduledArmOrders.find(
+        const previousOrder = tempOrdersArr.find(
           (ord: any) => ord.work_order_number === sortedOrder.previousLoadOrder
         );
         if (previousOrder) {
@@ -89,12 +140,16 @@ const getOrdersWithStartDates = (allOrders: any) => {
             previousOrder.startDate,
             previousOrder.duration
           );
-          tempScheduledArmOrders.push({ ...sortedOrder, startDate });
+          tempOrdersArr.push({ ...sortedOrder, startDate });
+        } else {
+          console.error(
+            `Util.ts - In row: ${key}, The scheduler was unable to plot an order (ID: ${sortedOrder.id}) because the previous loaded order (load_after: ${sortedOrder.previousLoadOrder}) doesn't exist. `
+          );
         }
       }
     });
   });
-  return tempScheduledArmOrders;
+  return tempOrdersArr;
 };
 
 // Helper function to remove resources that have no events in them- except for the last resource
@@ -115,7 +170,9 @@ const cleanupResources = (resourceStore: any) => {
       toDelete.push(resourceId);
     }
   });
-  resourceStore.remove(toDelete);
+  if (toDelete.length > 0) {
+    resourceStore.remove(toDelete);
+  }
 };
 
 // Helper function to grab the resources off of list of all scheduled orders. Used to build the
@@ -178,7 +235,9 @@ export {
   getEventAdjustedDuration,
   mapToOrderModel,
   normalizeOrder,
+  mapToCounterWeightModel,
   getOrdersWithStartDates,
   cleanupResources,
   getResourcesFromOrders,
+  mapToHardBreakModel,
 };

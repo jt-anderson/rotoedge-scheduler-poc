@@ -53,7 +53,7 @@ const weekPreset = new ViewPreset({
   timeResolution: {
     // Dates will be snapped to this resolution
     unit: "minute", // Valid values are 'millisecond', 'second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'.
-    increment: 15,
+    increment: 1,
   },
   mainHeaderLevel: 1,
   headers: [

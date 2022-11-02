@@ -1,5 +1,4 @@
 import React from "react";
-import ArmDetail from "./ArmDetail";
 
 interface CustomDragContainerProps {
   armId: number;

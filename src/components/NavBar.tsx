@@ -20,10 +20,6 @@ import MuiDrawer from "@mui/material/Drawer";
 import Menu from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronLeft";
-import EventNote from "@mui/icons-material/EventNote";
-import Input from "@mui/icons-material/Input";
-import Cached from "@mui/icons-material/Cached";
-import HomeIcon from "@mui/icons-material/Home";
 import Typography from "@mui/material/Typography";
 
 // ======================================================= copy pastaed from MUI docs for the permanent sidebar
@@ -141,7 +137,7 @@ interface NavHeaderProps {
 const NavHeader: FC<NavHeaderProps> = ({ navList }) => {
   const theme = useTheme();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading] = useState<boolean>(false);
 
   const handleDrawerOpen = () => setDrawerOpen(true);
   const handleDrawerClose = () => setDrawerOpen(false);

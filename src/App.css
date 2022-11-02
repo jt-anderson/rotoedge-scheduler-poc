@@ -2,8 +2,8 @@
  * Main application sass file that contains all the application styling
  */
 
-// import bryntum theme
-// @import "~@bryntum/scheduler/scheduler.stockholm.css";
+/* // import bryntum theme */
+/* // @import "~@bryntum/scheduler/scheduler.stockholm.css"; */
 
 body,
 html {
@@ -33,7 +33,7 @@ html {
   min-height: 48px !important;
 }
 
-// =============== This CSS below should be added ==================
+/* // =============== This CSS below should be added ================== */
 @import "~@bryntum/scheduler/scheduler.material.css";
 
 #innerAppContainer {
@@ -67,13 +67,13 @@ html {
 }
 
 .b-gridbase.b-autoheight {
-  // Override the Scheduler to allow the grid to auto scale height
+  /* // Override the Scheduler to allow the grid to auto scale height */
   flex: 1 !important;
 }
 
-// Making all of these elements !important because material-ui applies
-// inline styling to its components. You could also override this at
-// the component level but I'm not sure where that will be in the source code.
+/* /* // Making all of these elements !important because material-ui applies */
+/* // inline styling to its components. You could also override this at */
+/* // the component level but I'm not sure where that will be in the source code. */
 .custom-dragged-element {
   display: flex !important;
   flex-direction: row !important;
@@ -103,7 +103,7 @@ html {
   margin: 2.5px 2.5px 0 0;
 }
 
-// Hard break flag styling
+/* // Hard break flag styling */
 .hard-break-scheduler {
   background-color: #d52929 !important;
   border-color: #d52929 !important;
@@ -117,10 +117,10 @@ html {
   background-color: inherit !important;
 }
 
-// There is a bug if you add 'cls' to the showCurrentTimeLine object in the
-// scheduler > features > timeRanges section, it will allow you to drag the
-// flag which breaks the page. Internal error on Bryntum's side so I'm
-// just overwritting the styles manually
+/* // There is a bug if you add 'cls' to the showCurrentTimeLine object in the */
+/* // scheduler > features > timeRanges section, it will allow you to drag the */
+/* // flag which breaks the page. Internal error on Bryntum's side so I'm */
+/* // just overwritting the styles manually */
 .b-grid-header .b-sch-timerange.b-sch-current-time {
   background-color: #219534 !important;
 }
@@ -143,4 +143,43 @@ html {
   padding-top: 5px !important;
   padding-left: 15px !important;
   padding-bottom: 5px !important;
+}
+
+.scheduler-bar {
+  border-radius: 5px;
+  border: solid 1px;
+  border-color: black !important;
+  background-color: rgb(189 175 108) !important;
+}
+
+.scheduler-bar-currently-molding {
+  background-color: rgb(53, 152, 220) !important;
+}
+
+.scheduler-bar-counter-weight {
+  /* color: black !important; */
+  background-color: rgb(167, 167, 167) !important;
+}
+
+.counter-weight-button {
+  display: flex;
+  border: solid 1px rgb(100, 100, 100);
+  border-radius: 5px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  background-color: rgb(167, 167, 167);
+  align-items: center;
+  color: white;
+  vertical-align: center;
+  padding-left: 10px;
+  border-radius: 5px;
+  --b-fa-font-solid: normal 900 1em/1 "Font Awesome 6 Free";
+  font-weight: 400;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: Roboto, sans-serif;
+  user-select: none;
 }
